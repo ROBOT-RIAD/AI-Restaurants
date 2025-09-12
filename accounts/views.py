@@ -1,0 +1,424 @@
+from rest_framework import status, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from .serializers import UserRestaurantSerializer, UserSerializer,RestaurantSerializer,CustomTokenObtainPairSerializer,SendOTPSerializer,VerifyOTPSerializer,ResetPasswordSerializer,RestaurantFullDataserializer
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.generics import CreateAPIView
+from rest_framework.permissions import AllowAny
+from accounts.models import User,PasswordResetOTP
+from rest_framework.exceptions import ValidationError
+from .translations import translate_text
+from rest_framework_simplejwt.views import TokenObtainPairView,TokenRefreshView
+from django.core.mail import send_mail
+from django.conf import settings
+from table.models import Table, Reservation
+from restaurants.models import Restaurant
+from items.models import Item
+from django.utils.timezone import now
+
+
+
+
+class RegisterApiView(CreateAPIView):
+    """
+    API endpoint for registering a new user and creating a restaurant.
+    Also provides JWT token upon successful registration.
+    """
+    queryset = User.objects.all()
+    serializer_class = UserRestaurantSerializer
+    permission_classes = [AllowAny]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @swagger_auto_schema(
+        tags=["Authentication"],
+        operation_description="Register a new user and create a restaurant. Provides JWT tokens.",
+        request_body=UserRestaurantSerializer,
+        responses={
+            201: openapi.Response(
+                description="User and restaurant created successfully",
+                examples={
+                    'application/json': {
+                        'access_token': 'your_jwt_access_token_here',
+                        'refresh_token': 'your_jwt_refresh_token_here',
+                        'user': {
+                            'id': 1,
+                            'email': 'user@example.com',
+                            'role': 'Owner',
+                        },
+                        'restaurant': {
+                            'resturent_name': 'Best Restaurant',
+                            'address': '123 Street, City',
+                            'phone_number_1': '1234567890',
+                            'twilio_number': '9876543210',
+                            'opening_time': '10:00:00',
+                            'closing_time': '22:00:00',
+                            'website': 'https://example.com',
+                            'iban': 'IBAN1234567890',
+                            'tax_number': 'TAX123456',
+                        }
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Bad Request, validation errors",
+                examples={
+                    'application/json': {
+                        "email": ["This field is required."]
+                    }
+                }
+            ),
+            500: openapi.Response(
+                description="Internal Server Error",
+                examples={
+                    'application/json': {
+                        "error": "Error message"
+                    }
+                }
+            )
+        },
+        manual_parameters=[
+            openapi.Parameter(
+                'lean', 
+                openapi.IN_QUERY, 
+                description="Language code for translation (default is 'en').", 
+                type=openapi.TYPE_STRING,
+                default='EN'
+            ),
+        ],
+    )
+    @csrf_exempt
+    def post(self, request, *args, **kwargs):
+        try:
+            lean = request.query_params.get('lean')
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            user, restaurant = serializer.save()
+
+
+
+            if lean != 'EN':
+                restaurant.resturent_name = translate_text(restaurant.resturent_name, 'EN')
+                print(restaurant.resturent_name)
+                restaurant.address = translate_text(restaurant.address, 'EN')
+                restaurant.save()
+
+
+            table_names = ['Table 1A', 'Table 1B', 'Table 1C', 'Table 1D', 'Table 1E']
+
+            for table_name in table_names:
+                Table.objects.create(
+                    restaurant=restaurant,
+                    table_name=table_name,
+                    total_set=4
+                )
+
+            # Generate JWT tokens (refresh and access)
+            refresh = RefreshToken.for_user(user)
+            refresh['email'] = user.email
+            refresh['role'] = user.role
+            access_token = str(refresh.access_token)
+
+            data = RestaurantSerializer(restaurant,context ={'request' : request}).data
+
+            if lean != 'EN':
+                data['resturent_name'] = translate_text(restaurant.resturent_name, lean)
+                data['address'] = translate_text(restaurant.address, lean)
+
+            response_data = {
+                'access_token': access_token,
+                'refresh_token': str(refresh), 
+                'user': {
+                    'id' : user.id,
+                    'email': user.email,
+                    'role': user.role,
+                },
+                'restaurant':data,
+            }
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except ValidationError as ve:
+            return Response({"errors": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)\
+            
+
+
+
+class LoginAPIView(TokenObtainPairView):
+    permission_classes = [AllowAny]
+    serializer_class = CustomTokenObtainPairSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    @swagger_auto_schema(
+        tags=["Authentication"],
+        manual_parameters=[
+            openapi.Parameter(
+                'lean', 
+                openapi.IN_QUERY, 
+                description="Language code for translation (default is 'en').", 
+                type=openapi.TYPE_STRING,
+                default='EN'
+            ),
+        ],
+    )
+    def post(self, request, *args, **kwargs):
+        try:
+            lean = request.query_params.get('lean')
+            response = super().post(request, *args, **kwargs)
+            response_data = response.data
+
+            if lean != 'EN' and 'restaurant' in response_data:
+                restaurant = response_data['restaurant']
+                restaurant['resturent_name'] = translate_text(restaurant.get('resturent_name'), lean)
+                restaurant['address'] = translate_text(restaurant.get('address'), lean)
+
+            return Response(response_data, status=status.HTTP_200_OK)
+        except ValidationError as ve:
+            return Response({"error": ve.detail}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e :
+            return Response({"error": str(e)}, status= status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+    
+
+class CustomTokenRefreshView(TokenRefreshView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(tags=["Authentication"])
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except Exception as e :
+            return Response({"error":str(e)} , status= status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+
+class SendOTPView(APIView):
+    permission_classes = [AllowAny]
+ 
+    @swagger_auto_schema(
+        request_body=SendOTPSerializer,
+        tags=["Forgot Password"],
+        operation_summary="Send OTP to email",
+        responses={200: openapi.Response('OTP sent'), 400: 'Bad Request'}
+    )
+    def post(self, request):
+        serializer = SendOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            email = serializer.validated_data['email']
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            otp_record = PasswordResetOTP.objects.create(user=user)
+        
+            # Send OTP via email
+            send_mail(
+            subject='Your OTP Code',
+            message=f'Your OTP is: {otp_record.otp}',
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=[email],
+            )
+
+            return Response({
+                "message": "OTP sent to your email.",
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": "Failed to send OTP."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+class VerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        request_body=VerifyOTPSerializer,
+        tags=["Forgot Password"],
+        operation_summary="Verify OTP",
+        responses={200: openapi.Response('OTP verified'), 400: 'Invalid OTP'}
+    )
+
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        otp = serializer.validated_data['otp']
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            otp_record = PasswordResetOTP.objects.filter(
+                user=user, otp=otp, is_verified=False
+            ).latest('created_at')
+        except PasswordResetOTP.DoesNotExist:
+            return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_record.is_verified = True
+        otp_record.save()
+
+        return Response({"message": "OTP verified successfully."}, status=status.HTTP_200_OK)
+
+
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny] 
+
+    @swagger_auto_schema(
+        request_body=ResetPasswordSerializer,
+        manual_parameters=[
+            openapi.Parameter(
+                'email',
+                openapi.IN_QUERY,
+                description="Email address to reset password for",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        tags=["Forgot Password"],
+        operation_summary="Reset password after OTP verification",
+        responses={200: openapi.Response('Password reset successful'), 400: 'Bad Request'}
+    )
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = request.query_params.get('email')
+        if not email:
+            return Response({"error": "Email is required in query params."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            otp_record = PasswordResetOTP.objects.filter(
+                user=user, is_verified=True
+            ).latest('created_at')
+        except PasswordResetOTP.DoesNotExist:
+            return Response({"error": "OTP not verified or expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            otp_record.delete()
+            return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error" : e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+
+class RestaurantFullDataAPIView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = RestaurantFullDataserializer
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "twilio_number": openapi.Schema(type=openapi.TYPE_STRING)
+            },
+            required=["twilio_number"],
+        ),
+        responses={200: "Restaurant full data (info, items, tables, reservations)"},
+        tags=["Webhook"]
+    )
+    def post(self, request):
+        twilio_number = request.data.get("twilio_number")
+
+        if not twilio_number:
+            return Response({"error": "twilio_number is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            restaurant = Restaurant.objects.get(twilio_number=twilio_number)
+        except Restaurant.DoesNotExist:
+            return Response({"error": "Restaurant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get related data
+        items = Item.objects.filter(restaurant=restaurant)
+        tables = Table.objects.filter(restaurant=restaurant)
+        today = now().date()
+        reservations = Reservation.objects.filter(table__restaurant=restaurant, date__gte=today)
+
+        # Prepare response
+        data = {
+            "restaurant": {
+                "id": restaurant.id,
+                "name": restaurant.resturent_name,
+                "address": restaurant.address,
+                "phone_number_1": restaurant.phone_number_1,
+                "twilio_number": restaurant.twilio_number,
+                "opening_time": restaurant.opening_time,
+                "closing_time": restaurant.closing_time,
+                "website": restaurant.website,
+                "iban": restaurant.iban,
+                "tax_number": restaurant.tax_number,
+            },
+            "items": [
+                {
+                    "id": item.id,
+                    "name": item.item_name,
+                    "status": item.status,
+                    "description": item.descriptions,
+                    "image": item.image.url if item.image else None,
+                    "category": item.category,
+                    "price": str(item.price),
+                    "discount": str(item.discount) if item.discount else None,
+                    "preparation_time": item.preparation_time,
+                }
+                for item in items
+            ],
+            "tables": [
+                {
+                    "id": table.id,
+                    "name": table.table_name,
+                    "status": table.status,
+                    "reservation_status": table.reservation_status,
+                    "total_set": table.total_set,
+                }
+                for table in tables
+            ],
+            "reservations": [
+                {
+                    "id": res.id,
+                    # "customer_name": res.customer_name,
+                    # "phone_number": res.phone_number,
+                    "guest_no": res.guest_no,
+                    "status": res.status,
+                    "date": res.date,
+                    "from_time": res.from_time,
+                    "to_time": res.to_time,
+                    "table": res.table.table_name,
+                    "email": res.email,
+                }
+                for res in reservations
+            ]
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+
