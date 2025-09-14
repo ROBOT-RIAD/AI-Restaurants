@@ -3,6 +3,9 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.hashers import make_password, check_password
 from restaurants.models import Restaurant
 
+
+
+
 class Assistance(models.Model):
     restaurant = models.OneToOneField(Restaurant, on_delete=models.CASCADE, related_name='ai_assistance')
     twilio_number = models.CharField(max_length=20, unique=True)
@@ -29,3 +32,24 @@ class Assistance(models.Model):
 
     def __str__(self):
         return f"AI Assistance for {self.restaurant.resturent_name}"
+    
+
+
+
+class CallInformations(models.Model):
+    type = models.CharField(max_length=100,blank=True , null = True)
+    call_date_utc = models.DateTimeField()
+    duration_seconds = models.CharField(max_length=100)
+    summary = models.TextField()
+    recording = models.CharField(max_length=1000)
+    customer_name = models.CharField(max_length=255)
+    email = models.EmailField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    phone = models.CharField(max_length=15,null=True, blank=True)
+    
+
+
+
+
+
+
