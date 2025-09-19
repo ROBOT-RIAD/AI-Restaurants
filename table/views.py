@@ -22,6 +22,7 @@ from django.conf import settings
 from django.utils.html import format_html
 from django.db.models import Sum
 from rest_framework.permissions import AllowAny
+from rest_framework.parsers import JSONParser
 
 
 
@@ -937,7 +938,8 @@ class TableReservationsView(APIView):
 
 class PublicReservationCreateAPIView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [MultiPartParser, FormParser]
+    # parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser]
 
     @swagger_auto_schema(
         operation_description="Create a new reservations for the logged-in owner's restaurant.",

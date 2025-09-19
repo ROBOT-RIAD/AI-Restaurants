@@ -19,6 +19,8 @@ from table.models import Table, Reservation
 from restaurants.models import Restaurant
 from items.models import Item
 from django.utils.timezone import now
+from order.models import Order
+from customerService.models import CustomerService
 
 
 
@@ -330,7 +332,6 @@ class ResetPasswordView(APIView):
 
 
 
-
 class RestaurantFullDataAPIView(APIView):
     permission_classes = [AllowAny]
     serializer_class = RestaurantFullDataserializer
@@ -362,6 +363,99 @@ class RestaurantFullDataAPIView(APIView):
         tables = Table.objects.filter(restaurant=restaurant)
         today = now().date()
         reservations = Reservation.objects.filter(table__restaurant=restaurant, date__gte=today)
+
+        # Group reservations by table
+        table_reservations = {}
+        for reservation in reservations:
+            table_reservations.setdefault(reservation.table.id, []).append({
+                "id": reservation.id,
+                "guest_no": reservation.guest_no,
+                "status": reservation.status,
+                "date": reservation.date,
+                "from_time": reservation.from_time,
+                "to_time": reservation.to_time,
+                "table": reservation.table.table_name,
+                "email": reservation.email,
+            })
+        # Collect distinct phone numbers
+        phones = set(
+            list(
+                Reservation.objects.filter(table__restaurant=restaurant)
+                .exclude(phone_number__isnull=True)
+                .values_list("phone_number", flat=True)
+            )
+            + list(
+                Order.objects.filter(restaurant=restaurant)
+                .exclude(phone__isnull=True)
+                .values_list("phone", flat=True)
+            )
+            + list(
+                CustomerService.objects.filter(restaurant=restaurant)
+                .exclude(phone_number__isnull=True)
+                .values_list("phone_number", flat=True)
+            )
+        )
+
+        customer_data = {}
+
+        for phone in phones:
+            # Latest Reservation
+            last_res = (
+                Reservation.objects.filter(table__restaurant=restaurant, phone_number=phone)
+                .order_by("-created_at")
+                .first()
+            )
+            res_count = Reservation.objects.filter(table__restaurant=restaurant, phone_number=phone).count()
+
+            # Latest Order
+            last_order = (
+                Order.objects.filter(restaurant=restaurant, phone=phone)
+                .order_by("-created_at")
+                .first()
+            )
+            order_count = Order.objects.filter(restaurant=restaurant, phone=phone).count()
+
+            # Latest Service
+            last_service = (
+                CustomerService.objects.filter(restaurant=restaurant, phone_number=phone)
+                .order_by("-created_at")
+                .first()
+            )
+            service_count = CustomerService.objects.filter(restaurant=restaurant, phone_number=phone).count()
+
+             # List of non-None records
+            records = [last_res, last_order, last_service]
+
+            # Filter out None values before finding the latest record
+            records = [record for record in records if record is not None]
+
+            # Pick the most recent record
+            latest_record = max(records, key=lambda x: x.created_at if x else None) if records else None
+
+            if latest_record:
+                if isinstance(latest_record, Reservation):
+                    last_type = "reservation"
+                    name = latest_record.customer_name
+                elif isinstance(latest_record, Order):
+                    last_type = "order"
+                    name = latest_record.customer_name
+                elif isinstance(latest_record, CustomerService):
+                    last_type = "service"
+                    name = latest_record.customer_name
+                else:
+                    last_type, name = None, None
+            else:
+                last_type, name = None, None
+
+            customer_data[phone] = {
+                "name": name,
+                "phone": phone,
+                "most_recent_last": {
+                    "type": last_type,
+                    "created_at": latest_record.created_at if latest_record else None,
+                },
+                "total_create": res_count + order_count + service_count,
+            }
 
         # Prepare response
         data = {
@@ -398,27 +492,11 @@ class RestaurantFullDataAPIView(APIView):
                     "status": table.status,
                     "reservation_status": table.reservation_status,
                     "total_set": table.total_set,
+                    "reservations": table_reservations.get(table.id, []),  # Add reservations grouped by table
                 }
                 for table in tables
             ],
-            "reservations": [
-                {
-                    "id": res.id,
-                    # "customer_name": res.customer_name,
-                    # "phone_number": res.phone_number,
-                    "guest_no": res.guest_no,
-                    "status": res.status,
-                    "date": res.date,
-                    "from_time": res.from_time,
-                    "to_time": res.to_time,
-                    "table": res.table.table_name,
-                    "email": res.email,
-                }
-                for res in reservations
-            ]
+            "customers": list(customer_data.values()),
         }
 
         return Response(data, status=status.HTTP_200_OK)
-
-
-

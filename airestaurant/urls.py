@@ -49,6 +49,7 @@ urlpatterns = [
     path('', include("accounts.urls")),
     path('owner/', include("owner.urls")),
     path('adminapi/', include("adminapi.urls")),
+    path('subscription/', include('subscription.urls')),
 
 
     # Swagger/OpenAPI URLs
