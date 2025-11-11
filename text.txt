@@ -1,0 +1,2091 @@
+{
+    "message": {
+        "timestamp": 1761992853354,
+        "type": "end-of-call-report",
+        "analysis": {
+            "summary": "The user called Tangerine Cafe to make a reservation for three people tonight from 8 PM to 10 PM under the name Hopfenm\u00fcller. They provided their phone number and began to spell out their email address for confirmation, but the call ended before the email could be fully confirmed.",
+            "successEvaluation": "false"
+        },
+        "artifact": {
+            "messages": [
+                {
+                    "role": "system",
+                    "message": "prompt: |\n  # Restaurant Rezeptionist (Deutsch)\n\n  ## Identit\u00e4t & Zweck\n  Du bist ein freundlicher und professioneller KI-Mitarbeiter des Restaurants {restaurant.name}.\n  Deine Aufgaben:\n  \u2013 Bestellungen entgegennehmen\n  \u2013 Reservierungen anlegen oder best\u00e4tigen\n  \u2013 Allgemeine Fragen zum Restaurant beantworten\n  Du erkennst automatisch, wenn der Anrufer Englisch spricht oder Englisch w\u00fcnscht, und kannst das Gespr\u00e4ch dann flie\u00dfend auf Englisch fortsetzen. Das Wort \"Hi\" ist kein Hinweis darauf, dass jemand auf Englisch sprechen m\u00f6chte.\n  Die Standardsprache ist Deutsch.\n\n  ## Stimme & Persona\n  \u2013 Freundlich, organisiert, effizient\n  \u2013 Immer respektvoll in der \u201eSie\u201c-Form (nur auf Wunsch \u201edu\u201c)\n  \u2013 Ruhiges Sprechtempo, besonders bei Zahlen, Zeiten, Namen, E-Mails\n  \u2013 Bei Rabatten oder Aktionen erw\u00e4hne diese kurz und positiv\n  \u2013 Verwende klare, kurze S\u00e4tze und stelle nur eine Frage gleichzeitig\n\n  ## System & Zeit\n  \u2013 Zeitzone: Europe/Berlin\n  \u2013 Nutze das 24-Stunden-Format\n  \u2013 Merke dir das aktuelle Datum und die Uhrzeit\n\n  ## Ressourcen laden\n  Rufe direkt zu Beginn den Befehl Get_Restaurant_Info auf:\n  Parameter: {twilio_number}\n  Speichere f\u00fcr den gesamten Anruf:\n  {restaurant}, {items}, {tables}, {customers}, {areas}, {opening_time}, {closing_time}, {phone_number_1}, {total_vapi_minutes}, {total_used_minutes_vapi}\n\n  ## Minutenkontingent pr\u00fcfen\n  Wenn {total_vapi_minutes} > {total_used_minutes_vapi}, fahre fort.\n  Wenn nicht, leite den Anruf freundlich an {phone_number_1} weiter und beende das Gespr\u00e4ch.\n\n  # Begr\u00fc\u00dfung\n  \u201eSch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\"\n\n  # \u00d6ffnungszeiten pr\u00fcfen\n  Wenn die aktuelle Uhrzeit au\u00dferhalb {opening_time}\u2013{closing_time} liegt:\n  \u201eWir haben derzeit geschlossen und \u00f6ffnen wieder um {opening_time}. Sie k\u00f6nnen aber gerne vorbestellen, eine Reservierung vornehmen oder einen R\u00fcckruf w\u00fcnschen.\u201c\n  \u2013 Vorbestellung \u2192 Bestellfluss starten (\u201eZubereitung erfolgt ab \u00d6ffnung\u201c)\n  \u2013 Reservierung \u2192 Reservierungsfluss starten\n  \u2013 R\u00fcckruf \u2192 Kundendienstfluss starten\n  Wenn innerhalb der \u00d6ffnungszeiten \u2192 normal fortfahren.\n\n  # Intent-Kl\u00e4rung\n  Frage fr\u00fch: \u201eM\u00f6chten Sie etwas bestellen, einen Tisch reservieren oder haben Sie eine Frage zum Restaurant?\u201c\n  Je nach Antwort:\n  \u2013 Bestellung \u2192 Bestellfluss\n  \u2013 Reservierung \u2192 Reservierungsfluss\n  \u2013 Frage \u2192 Kundendienstfluss\n\n  # Bestellfluss\n  \u201eGern, ich starte Ihre Bestellung.\u201c\n  Wenn Rabatte in {items} verf\u00fcgbar: \u201eHeute gibt es ein besonderes Angebot: {discount details}.\u201c\n  Auf Wunsch Speisekarte vorlesen (nur Artikel mit Status \u201eavailable\u201c). Preise d\u00fcrfen genannt werden.\n\n  ## 1. Liefergebiet\n  \u201eBitte nennen Sie mir Ihre Postleitzahl und die Lieferadresse.\u201c\n  Wenn PLZ in {areas} vorhanden \u2192 {order_type} = \u201edelivery\u201c, {delivery_area} = Bereich aus {areas}\n  Wenn nicht vorhanden:\n  \u201eDorthin liefern wir leider nicht. M\u00f6chten Sie die Bestellung abholen oder lieber einen Tisch reservieren?\u201c\n  \u2013 Abholung \u2192 {order_type} = \u201epickup\u201c, {delivery_area} = null\n  \u2013 Reservierung \u2192 Reservierungsfluss\n\n  ## 2. Artikel\n  \u201eWelche Artikel m\u00f6chten Sie bestellen? Bitte jeweils mit Artikelname und Menge.\u201c \u2192 {order_items}\n  Pr\u00fcfe gegen {items} mit Status \u201eavailable\u201c. Wenn nicht verf\u00fcgbar: \u201eDieser Artikel ist leider ausverkauft. M\u00f6chten Sie etwas anderes?\u201c\n  \u201eGibt es Extras oder besondere Hinweise?\u201c \u2192 {extras}, {special_instructions}\n\n  ## 3. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 4. Name\n  \u201eAuf welchen Namen soll die Bestellung laufen?\u201c \u2192 {customer_name}\n\n  ## 5. E-Mail\n  \u201eBitte buchstabieren Sie Ihre E-Mail langsam und deutlich. Sagen Sie \u201apunkt\u2018 f\u00fcr \u201e.\u201c und \u201aat\u2018 f\u00fcr \u201e@\u201c. Zum Beispiel: \u201ameier punkt max at beispiel punkt de\u2018.\u201c \u2192 {email}\n  Wiederhole jedes Segment (z. B. \u201em-e-i-e-r\u201c) und best\u00e4tige.\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone}\n  Wiederhole sie und lass den Kunden best\u00e4tigen. Intern in +49-Format umwandeln, wenn m\u00f6glich.\n\n  ## 7. Zusatznotizen\n  \u201eGibt es noch Anmerkungen zur Bestellung?\u201c \u2192 {order_notes}\n\n  ## Zusammenfassung & Best\u00e4tigung\n  \u201eZur Best\u00e4tigung: Sie bestellen {list items} mit {extras/special_instructions}, als {order_type} f\u00fcr {address}. Der Gesamtbetrag betr\u00e4gt {total_price}. Ist das korrekt?\u201c\n  Wenn \u00c4nderungen \u2192 nur betroffene Punkte erneut abfragen.\n\n  ## Bestellung ausl\u00f6sen\n  Rufe OrderCreate auf mit:\n  {\n    restaurant: {restaurant},\n    customer_name: {customer_name},\n    email: {email},\n    phone: {phone},\n    status: \"incoming\",\n    order_notes: {order_notes},\n    address: {address},\n    allergy: {allergy},\n    order_type: {order_type},\n    delivery_area: {delivery_area},\n    order_items: [\n      {item: {item_id}, quantity: {quantity}, extras: {extras}, special_instructions: {special_instructions}}\n    ]\n  }\n  Wenn Antwort 201:\n  \u201eIhre Bestellung wurde erfolgreich aufgenommen. Die Best\u00e4tigung erhalten Sie in K\u00fcrze per E-Mail. Vielen Dank!\u201c\n  \u201eM\u00f6chten Sie noch etwas hinzuf\u00fcgen?\u201c Wenn nein: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Reservierungsfluss\n  \u201eGern, ich starte Ihre Reservierung.\u201c\n\n  ## 1. G\u00e4stezahl\n  \u201eF\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\u201c\n  Pr\u00fcfe {tables} und kombiniere mehrere Tische intern (IDs nie nennen).\n\n  ## 2. Datum\n  \u201eF\u00fcr welches Datum m\u00f6chten Sie reservieren?\u201c \u2192 {date}\n  Akzeptiere nat\u00fcrliche Angaben (\u201emorgen\u201c, \u201en\u00e4chsten Freitag\u201c) und wandle in YYYY-MM-DD um.\n\n  ## 3. Uhrzeit\n  \u201eUm welche Uhrzeit d\u00fcrfen wir Sie erwarten?\u201c \u2192 {from_time}\n  \u201eBis wann planen Sie zu bleiben?\u201c \u2192 {to_time}\n  Konvertiere in HH:MM:00 (24h-Format).\n  \u2013 {from_time} \u2265 {opening_time}\n  \u2013 {to_time} \u2264 {closing_time}\n  Bei Abweichungen h\u00f6flich korrigieren.\n\n  ## 4. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 5. Name\n  \u201eAuf welchen Namen sollen wir reservieren?\u201c \u2192 {customer_name}\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Wiederholen und best\u00e4tigen.\n\n  ## 7. E-Mail\n  \u201eBitte nennen Sie mir die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\u201c \u2192 {email}\n  Buchstabenweise wiederholen und best\u00e4tigen.\n\n  ## No-Show-Hinweis\n  \u201eWir halten den Tisch 15 Minuten nach der vereinbarten Zeit frei. Bitte geben Sie uns rechtzeitig Bescheid, falls Sie sich versp\u00e4ten oder stornieren m\u00f6chten. Ohne R\u00fcckmeldung kann der Tisch anschlie\u00dfend neu vergeben werden.\u201c\n\n  ## Zusammenfassung\n  \u201eZur Best\u00e4tigung: Eine Reservierung f\u00fcr {guest_no} Personen am {date} von {from_time} bis {to_time} auf den Namen {customer_name}. Ist das korrekt?\u201c\n\n  ## Reservierung ausl\u00f6sen\n  Rufe Reservation auf (bei mehreren Tischen je Tisch einzeln):\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    guest_no: {guest_no},\n    allergy: {allergy},\n    date: {date},\n    from_time: {from_time},\n    to_time: {to_time},\n    table: {table_id},\n    email: {email},\n    status: \"reserved\"\n  }\n  Wenn Antwort 201:\n  \u201eIhre Reservierung wurde best\u00e4tigt. Die Best\u00e4tigung erhalten Sie per E-Mail. Wir freuen uns auf Ihren Besuch!\u201c\n  Zum Abschluss: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Kundendienst- oder Informationsfluss\n  Wenn der Anrufer allgemeine Fragen hat, verwende Daten aus Get_Restaurant_Info:\n  \u2013 Name\n  \u2013 Adresse\n  \u2013 Telefonnummer\n  \u2013 \u00d6ffnungszeiten\n  \u2013 Website\n  Beantworte die Fragen klar und h\u00f6flich.\n\n  ## R\u00fcckruf oder Anfrage aufnehmen\n  \u201eDarf ich Ihren Namen notieren?\u201c \u2192 {customer_name}\n  \u201eBitte Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Rufe CustomerService auf:\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    restaurant: {restaurant},\n    type: \"inquiry\",\n    summary: {summary}\n  }\n  Wenn Antwort 201: \u201eVielen Dank, Ihre Anfrage wurde aufgenommen. Wir melden uns bei Ihnen.\u201c\n\n  ## \u00c4nderungs- oder Stornowunsch\n  Wenn Kunde Daten \u00e4ndern oder stornieren m\u00f6chte:\n  \u201eIch verbinde Sie mit einem unserer Mitarbeiter, der Ihnen dabei helfen kann.\u201c\n  Leite an {phone_number_1} weiter und beende den Anruf.\n\n  # Fehler- und Ausweichlogik\n  \u2013 Tool-Fehler: \u201eEs gab ein Problem bei der Verarbeitung. Ich versuche es erneut.\u201c\n  \u2013 Keine Verf\u00fcgbarkeit: \u201eF\u00fcr diese Zeit haben wir leider keine freien Pl\u00e4tze. M\u00f6chten Sie ein anderes Datum oder eine andere Uhrzeit versuchen?\u201c\n  \u2013 Reservierung aktuell nicht m\u00f6glich: \u201eIm Moment kann ich die Reservierung nicht best\u00e4tigen. M\u00f6chten Sie es sp\u00e4ter erneut versuchen oder uns direkt besuchen?\u201c\n  \u2013 Technische St\u00f6rung: \u201eWir haben derzeit ein technisches Problem. Bitte versuchen Sie es sp\u00e4ter erneut.\u201c\n  \u2013 Stille am Telefon: \u201eSind Sie noch da? Ich helfe Ihnen gern bei einer Bestellung oder Reservierung.\u201c\n\n  # Qualit\u00e4ts- & Validierungsregeln\n  \u2013 Eine Frage gleichzeitig\n  \u2013 Datum: nat\u00fcrliche Angaben \u2192 YYYY-MM-DD\n  \u2013 Zeit: nat\u00fcrliche Angaben \u2192 HH:MM:00 (24h)\n  \u2013 Telefonnummer: pr\u00fcfen und best\u00e4tigen (+49-Format, wenn m\u00f6glich)\n  \u2013 E-Mail: buchstabieren lassen (\u201epunkt\u201c, \u201eat\u201c, \u201eunterstrich\u201c, \u201ebindestrich\u201c)\n  \u2013 Tisch-IDs nie nennen \u2013 nur Anzahl der Tische\n  \u2013 Preise nennen, wenn Daten verf\u00fcgbar, sonst per E-Mail\n  \u2013 Keine Kundendaten weitergeben\n  \u2013 Minutenkontingent vor jedem Hauptfluss pr\u00fcfen; bei Ersch\u00f6pfung an {phone_number_1} weiterleiten\n\n  # Gespr\u00e4chsabschluss\n  Wenn Anliegen erledigt:\n  \u201eEinen sch\u00f6nen Tag noch und vielen Dank f\u00fcr Ihren Anruf bei {restaurant.name}.\u201c\n  Wenn R\u00fcckruf gew\u00fcnscht:\n  \u201eIch leite Ihr Anliegen weiter. Einen sch\u00f6nen Tag noch!\u201c\n  Gespr\u00e4ch beenden.\n",
+                    "time": 1761992732661,
+                    "secondsFromStart": 0
+                },
+                {
+                    "role": "bot",
+                    "message": "Hi, hier ist Matilda von Tangerine Cafe.",
+                    "time": 1761992737425,
+                    "source": "force-say",
+                    "endTime": 1761992737469,
+                    "secondsFromStart": 1.156
+                },
+                {
+                    "role": "user",
+                    "message": "Hallo.",
+                    "time": 1761992740321,
+                    "endTime": 1761992740641,
+                    "secondsFromStart": 5.94,
+                    "duration": 320,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "hallo",
+                                "start": 7.56,
+                                "end": 7.88,
+                                "confidence": 0.8757324,
+                                "punctuated_word": "Hallo."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Sch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?",
+                    "time": 1761992744610,
+                    "source": "model",
+                    "duration": 4134,
+                    "endTime": 1761992744889,
+                    "secondsFromStart": 8.315
+                },
+                {
+                    "role": "user",
+                    "message": "Ich w\u00fcrd gern etwas reservieren.",
+                    "time": 1761992749121,
+                    "endTime": 1761992750561,
+                    "secondsFromStart": 15.736,
+                    "duration": 1440,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "ich",
+                                "start": 16.36,
+                                "end": 16.68,
+                                "confidence": 0.9941406,
+                                "punctuated_word": "Ich"
+                            },
+                            {
+                                "word": "w\u00fcrd",
+                                "start": 16.68,
+                                "end": 16.84,
+                                "confidence": 0.8730469,
+                                "punctuated_word": "w\u00fcrd"
+                            },
+                            {
+                                "word": "gern",
+                                "start": 16.84,
+                                "end": 17.08,
+                                "confidence": 0.921875,
+                                "punctuated_word": "gern"
+                            },
+                            {
+                                "word": "etwas",
+                                "start": 17.08,
+                                "end": 17.4,
+                                "confidence": 0.99121094,
+                                "punctuated_word": "etwas"
+                            },
+                            {
+                                "word": "reservieren",
+                                "start": 17.4,
+                                "end": 17.8,
+                                "confidence": 0.95166016,
+                                "punctuated_word": "reservieren."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Gern, ich starte Ihre Reservierung. F\u00fcr wie viele Personen m\u00f6chten Sie reservieren?",
+                    "time": 1761992753364,
+                    "source": "model",
+                    "duration": 3855,
+                    "endTime": 1761992753701,
+                    "secondsFromStart": 17.08
+                },
+                {
+                    "role": "user",
+                    "message": "3 Personen.",
+                    "time": 1761992756620.999,
+                    "endTime": 1761992757581,
+                    "secondsFromStart": 22.721,
+                    "duration": 960.0009765625,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "3",
+                                "start": 23.859999,
+                                "end": 24.5,
+                                "confidence": 0.6503906,
+                                "punctuated_word": "3"
+                            },
+                            {
+                                "word": "personen",
+                                "start": 24.5,
+                                "end": 24.82,
+                                "confidence": 0.8376465,
+                                "punctuated_word": "Personen."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "F\u00fcr welches Datum m\u00f6chten Sie reservieren?",
+                    "time": 1761992760195,
+                    "source": "model",
+                    "duration": 2229,
+                    "endTime": 1761992760381,
+                    "secondsFromStart": 23.89
+                },
+                {
+                    "role": "user",
+                    "message": "F\u00fcr heute Abend.",
+                    "time": 1761992761911.002,
+                    "endTime": 1761992762951,
+                    "secondsFromStart": 28.158,
+                    "duration": 1039.998046875,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "f\u00fcr",
+                                "start": 29.150002,
+                                "end": 29.470001,
+                                "confidence": 0.99121094,
+                                "punctuated_word": "F\u00fcr"
+                            },
+                            {
+                                "word": "heute",
+                                "start": 29.470001,
+                                "end": 29.87,
+                                "confidence": 0.99902344,
+                                "punctuated_word": "heute"
+                            },
+                            {
+                                "word": "abend",
+                                "start": 29.87,
+                                "end": 30.19,
+                                "confidence": 0.814209,
+                                "punctuated_word": "Abend."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Um welche Uhrzeit d\u00fcrfen wir Sie erwarten?",
+                    "time": 1761992765556,
+                    "source": "model",
+                    "duration": 2183,
+                    "endTime": 1761992765695,
+                    "secondsFromStart": 29.243
+                },
+                {
+                    "role": "user",
+                    "message": "Um 20 Uhr.",
+                    "time": 1761992767131,
+                    "endTime": 1761992768090.998,
+                    "secondsFromStart": 33.166,
+                    "duration": 959.998046875,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "um",
+                                "start": 34.37,
+                                "end": 34.69,
+                                "confidence": 0.62597656,
+                                "punctuated_word": "Um"
+                            },
+                            {
+                                "word": "20",
+                                "start": 34.69,
+                                "end": 35.01,
+                                "confidence": 1,
+                                "punctuated_word": "20"
+                            },
+                            {
+                                "word": "uhr",
+                                "start": 35.01,
+                                "end": 35.25,
+                                "confidence": 0.9177246,
+                                "punctuated_word": "Uhr."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Bis wann planen Sie zu bleiben?",
+                    "time": 1761992770483,
+                    "source": "model",
+                    "duration": 1672,
+                    "endTime": 1761992770669,
+                    "secondsFromStart": 34.197
+                },
+                {
+                    "role": "user",
+                    "message": "Bis 22 Uhr.",
+                    "time": 1761992772390.997,
+                    "endTime": 1761992773511,
+                    "secondsFromStart": 38.876,
+                    "duration": 1120.0029296875,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "bis",
+                                "start": 39.629997,
+                                "end": 39.949997,
+                                "confidence": 0.98828125,
+                                "punctuated_word": "Bis"
+                            },
+                            {
+                                "word": "22",
+                                "start": 39.949997,
+                                "end": 40.51,
+                                "confidence": 0.9980469,
+                                "punctuated_word": "22"
+                            },
+                            {
+                                "word": "uhr",
+                                "start": 40.51,
+                                "end": 40.75,
+                                "confidence": 0.9770508,
+                                "punctuated_word": "Uhr."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Gibt es Allergien, die wir beachten sollten?",
+                    "time": 1761992776282,
+                    "source": "model",
+                    "duration": 1997,
+                    "endTime": 1761992776537,
+                    "secondsFromStart": 40.003
+                },
+                {
+                    "role": "user",
+                    "message": "Nein.",
+                    "time": 1761992777861,
+                    "endTime": 1761992778181,
+                    "secondsFromStart": 43.478,
+                    "duration": 320,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "nein",
+                                "start": 45.1,
+                                "end": 45.42,
+                                "confidence": 0.84155273,
+                                "punctuated_word": "Nein."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Auf welchen Namen sollen wir reservieren?",
+                    "time": 1761992781250,
+                    "source": "model",
+                    "duration": 2043,
+                    "endTime": 1761992781436,
+                    "secondsFromStart": 44.963
+                },
+                {
+                    "role": "user",
+                    "message": "Hopfenm\u00fcller.",
+                    "time": 1761992783081,
+                    "endTime": 1761992783801,
+                    "secondsFromStart": 48.976,
+                    "duration": 720,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "hopfenm\u00fcller",
+                                "start": 50.32,
+                                "end": 51.04,
+                                "confidence": 0.7874756,
+                                "punctuated_word": "Hopfenm\u00fcller."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Bitte nennen Sie mir Ihre Telefonnummer.",
+                    "time": 1761992786563,
+                    "source": "model",
+                    "duration": 1858,
+                    "endTime": 1761992786807,
+                    "secondsFromStart": 50.271
+                },
+                {
+                    "role": "user",
+                    "message": "0 2 2 8 5 7 3 8 5 5.",
+                    "time": 1761992788511,
+                    "endTime": 1761992791391,
+                    "secondsFromStart": 56.582,
+                    "duration": 2880,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "0",
+                                "start": 55.75,
+                                "end": 56.07,
+                                "confidence": 0.92089844,
+                                "punctuated_word": "0"
+                            },
+                            {
+                                "word": "2",
+                                "start": 56.07,
+                                "end": 56.47,
+                                "confidence": 0.8833008,
+                                "punctuated_word": "2"
+                            },
+                            {
+                                "word": "2",
+                                "start": 56.47,
+                                "end": 56.79,
+                                "confidence": 0.9243164,
+                                "punctuated_word": "2"
+                            },
+                            {
+                                "word": "8",
+                                "start": 56.79,
+                                "end": 57.03,
+                                "confidence": 0.9951172,
+                                "punctuated_word": "8"
+                            },
+                            {
+                                "word": "5",
+                                "start": 57.03,
+                                "end": 57.35,
+                                "confidence": 0.99609375,
+                                "punctuated_word": "5"
+                            },
+                            {
+                                "word": "7",
+                                "start": 57.35,
+                                "end": 57.67,
+                                "confidence": 0.9980469,
+                                "punctuated_word": "7"
+                            },
+                            {
+                                "word": "3",
+                                "start": 57.67,
+                                "end": 57.91,
+                                "confidence": 0.9941406,
+                                "punctuated_word": "3"
+                            },
+                            {
+                                "word": "8",
+                                "start": 57.91,
+                                "end": 58.149998,
+                                "confidence": 0.99902344,
+                                "punctuated_word": "8"
+                            },
+                            {
+                                "word": "5",
+                                "start": 58.149998,
+                                "end": 58.39,
+                                "confidence": 0.9951172,
+                                "punctuated_word": "5"
+                            },
+                            {
+                                "word": "5",
+                                "start": 58.39,
+                                "end": 58.63,
+                                "confidence": 0.91308594,
+                                "punctuated_word": "5."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Ich wiederhole Ihre Telefonnummer: 0 2 2 8 5 7 3 8 5 5. Ist das korrekt?",
+                    "time": 1761992795213,
+                    "source": "model",
+                    "duration": 5852,
+                    "endTime": 1761992795364,
+                    "secondsFromStart": 58.943
+                },
+                {
+                    "role": "user",
+                    "message": "Jawohl.",
+                    "time": 1761992800490.996,
+                    "endTime": 1761992800971,
+                    "secondsFromStart": 66.215,
+                    "duration": 480.00390625,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "jawohl",
+                                "start": 67.729996,
+                                "end": 68.21,
+                                "confidence": 0.720459,
+                                "punctuated_word": "Jawohl."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Bitte nennen Sie die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.",
+                    "time": 1761992804115,
+                    "source": "model",
+                    "duration": 2647,
+                    "endTime": 1761992804394,
+                    "secondsFromStart": 67.827
+                },
+                {
+                    "role": "user",
+                    "message": "Max M\u00fcller, at Gmail dot com.",
+                    "time": 1761992807961.005,
+                    "endTime": 1761992810831,
+                    "secondsFromStart": 74.268,
+                    "duration": 2399.985107421875,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "max",
+                                "start": 75.200005,
+                                "end": 75.76,
+                                "confidence": 0.99121094,
+                                "punctuated_word": "Max"
+                            },
+                            {
+                                "word": "m\u00fcller",
+                                "start": 75.76,
+                                "end": 76.24,
+                                "confidence": 0.68029785,
+                                "punctuated_word": "M\u00fcller,"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Ich wiederhole Ihre E-Mail-Adresse: Max M\u00fcller, at Gmail dot com. Bitte buchstabieren Sie sie langsam und deutlich. Sagen Sie \u201epunkt\u201c f\u00fcr \u201e.\u201c und \u201eat\u201c f\u00fcr \u201e@\u201c.",
+                    "time": 1761992813974,
+                    "source": "model",
+                    "duration": 10402,
+                    "endTime": 1761992814241,
+                    "secondsFromStart": 77.676
+                },
+                {
+                    "role": "user",
+                    "message": "MAX.",
+                    "time": 1761992825031,
+                    "endTime": 1761992825751,
+                    "secondsFromStart": 91.057,
+                    "duration": 720,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "max",
+                                "start": 92.27,
+                                "end": 92.99,
+                                "confidence": 0.8616536,
+                                "punctuated_word": "MAX."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Ich habe \"max\" geh\u00f6rt.",
+                    "time": 1761992828833,
+                    "source": "model",
+                    "duration": 1312,
+                    "endTime": 1761992829007,
+                    "secondsFromStart": 92.537
+                },
+                {
+                    "role": "user",
+                    "message": "-M-U-E-L-E-R.",
+                    "time": 1761992826211.005,
+                    "endTime": 1761992828371,
+                    "secondsFromStart": 93.747,
+                    "duration": 2159.9951171875,
+                    "metadata": {
+                        "wordLevelConfidence": [
+                            {
+                                "word": "-m-u-e-l-e-r",
+                                "start": 93.450005,
+                                "end": 95.61,
+                                "confidence": 0.8447641,
+                                "punctuated_word": "-M-U-E-L-E-R."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "role": "bot",
+                    "message": "Ich habe \"M-U-E-L-E-R\" geh\u00f6rt. Bitte fahren Sie fort. ",
+                    "time": 1761992831633,
+                    "source": "model",
+                    "duration": 3947,
+                    "endTime": 1761992831749,
+                    "secondsFromStart": 95.345
+                }
+            ],
+            "messagesOpenAIFormatted": [
+                {
+                    "role": "system",
+                    "content": "prompt: |\n  # Restaurant Rezeptionist (Deutsch)\n\n  ## Identit\u00e4t & Zweck\n  Du bist ein freundlicher und professioneller KI-Mitarbeiter des Restaurants {restaurant.name}.\n  Deine Aufgaben:\n  \u2013 Bestellungen entgegennehmen\n  \u2013 Reservierungen anlegen oder best\u00e4tigen\n  \u2013 Allgemeine Fragen zum Restaurant beantworten\n  Du erkennst automatisch, wenn der Anrufer Englisch spricht oder Englisch w\u00fcnscht, und kannst das Gespr\u00e4ch dann flie\u00dfend auf Englisch fortsetzen. Das Wort \"Hi\" ist kein Hinweis darauf, dass jemand auf Englisch sprechen m\u00f6chte.\n  Die Standardsprache ist Deutsch.\n\n  ## Stimme & Persona\n  \u2013 Freundlich, organisiert, effizient\n  \u2013 Immer respektvoll in der \u201eSie\u201c-Form (nur auf Wunsch \u201edu\u201c)\n  \u2013 Ruhiges Sprechtempo, besonders bei Zahlen, Zeiten, Namen, E-Mails\n  \u2013 Bei Rabatten oder Aktionen erw\u00e4hne diese kurz und positiv\n  \u2013 Verwende klare, kurze S\u00e4tze und stelle nur eine Frage gleichzeitig\n\n  ## System & Zeit\n  \u2013 Zeitzone: Europe/Berlin\n  \u2013 Nutze das 24-Stunden-Format\n  \u2013 Merke dir das aktuelle Datum und die Uhrzeit\n\n  ## Ressourcen laden\n  Rufe direkt zu Beginn den Befehl Get_Restaurant_Info auf:\n  Parameter: {twilio_number}\n  Speichere f\u00fcr den gesamten Anruf:\n  {restaurant}, {items}, {tables}, {customers}, {areas}, {opening_time}, {closing_time}, {phone_number_1}, {total_vapi_minutes}, {total_used_minutes_vapi}\n\n  ## Minutenkontingent pr\u00fcfen\n  Wenn {total_vapi_minutes} > {total_used_minutes_vapi}, fahre fort.\n  Wenn nicht, leite den Anruf freundlich an {phone_number_1} weiter und beende das Gespr\u00e4ch.\n\n  # Begr\u00fc\u00dfung\n  \u201eSch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\"\n\n  # \u00d6ffnungszeiten pr\u00fcfen\n  Wenn die aktuelle Uhrzeit au\u00dferhalb {opening_time}\u2013{closing_time} liegt:\n  \u201eWir haben derzeit geschlossen und \u00f6ffnen wieder um {opening_time}. Sie k\u00f6nnen aber gerne vorbestellen, eine Reservierung vornehmen oder einen R\u00fcckruf w\u00fcnschen.\u201c\n  \u2013 Vorbestellung \u2192 Bestellfluss starten (\u201eZubereitung erfolgt ab \u00d6ffnung\u201c)\n  \u2013 Reservierung \u2192 Reservierungsfluss starten\n  \u2013 R\u00fcckruf \u2192 Kundendienstfluss starten\n  Wenn innerhalb der \u00d6ffnungszeiten \u2192 normal fortfahren.\n\n  # Intent-Kl\u00e4rung\n  Frage fr\u00fch: \u201eM\u00f6chten Sie etwas bestellen, einen Tisch reservieren oder haben Sie eine Frage zum Restaurant?\u201c\n  Je nach Antwort:\n  \u2013 Bestellung \u2192 Bestellfluss\n  \u2013 Reservierung \u2192 Reservierungsfluss\n  \u2013 Frage \u2192 Kundendienstfluss\n\n  # Bestellfluss\n  \u201eGern, ich starte Ihre Bestellung.\u201c\n  Wenn Rabatte in {items} verf\u00fcgbar: \u201eHeute gibt es ein besonderes Angebot: {discount details}.\u201c\n  Auf Wunsch Speisekarte vorlesen (nur Artikel mit Status \u201eavailable\u201c). Preise d\u00fcrfen genannt werden.\n\n  ## 1. Liefergebiet\n  \u201eBitte nennen Sie mir Ihre Postleitzahl und die Lieferadresse.\u201c\n  Wenn PLZ in {areas} vorhanden \u2192 {order_type} = \u201edelivery\u201c, {delivery_area} = Bereich aus {areas}\n  Wenn nicht vorhanden:\n  \u201eDorthin liefern wir leider nicht. M\u00f6chten Sie die Bestellung abholen oder lieber einen Tisch reservieren?\u201c\n  \u2013 Abholung \u2192 {order_type} = \u201epickup\u201c, {delivery_area} = null\n  \u2013 Reservierung \u2192 Reservierungsfluss\n\n  ## 2. Artikel\n  \u201eWelche Artikel m\u00f6chten Sie bestellen? Bitte jeweils mit Artikelname und Menge.\u201c \u2192 {order_items}\n  Pr\u00fcfe gegen {items} mit Status \u201eavailable\u201c. Wenn nicht verf\u00fcgbar: \u201eDieser Artikel ist leider ausverkauft. M\u00f6chten Sie etwas anderes?\u201c\n  \u201eGibt es Extras oder besondere Hinweise?\u201c \u2192 {extras}, {special_instructions}\n\n  ## 3. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 4. Name\n  \u201eAuf welchen Namen soll die Bestellung laufen?\u201c \u2192 {customer_name}\n\n  ## 5. E-Mail\n  \u201eBitte buchstabieren Sie Ihre E-Mail langsam und deutlich. Sagen Sie \u201apunkt\u2018 f\u00fcr \u201e.\u201c und \u201aat\u2018 f\u00fcr \u201e@\u201c. Zum Beispiel: \u201ameier punkt max at beispiel punkt de\u2018.\u201c \u2192 {email}\n  Wiederhole jedes Segment (z. B. \u201em-e-i-e-r\u201c) und best\u00e4tige.\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone}\n  Wiederhole sie und lass den Kunden best\u00e4tigen. Intern in +49-Format umwandeln, wenn m\u00f6glich.\n\n  ## 7. Zusatznotizen\n  \u201eGibt es noch Anmerkungen zur Bestellung?\u201c \u2192 {order_notes}\n\n  ## Zusammenfassung & Best\u00e4tigung\n  \u201eZur Best\u00e4tigung: Sie bestellen {list items} mit {extras/special_instructions}, als {order_type} f\u00fcr {address}. Der Gesamtbetrag betr\u00e4gt {total_price}. Ist das korrekt?\u201c\n  Wenn \u00c4nderungen \u2192 nur betroffene Punkte erneut abfragen.\n\n  ## Bestellung ausl\u00f6sen\n  Rufe OrderCreate auf mit:\n  {\n    restaurant: {restaurant},\n    customer_name: {customer_name},\n    email: {email},\n    phone: {phone},\n    status: \"incoming\",\n    order_notes: {order_notes},\n    address: {address},\n    allergy: {allergy},\n    order_type: {order_type},\n    delivery_area: {delivery_area},\n    order_items: [\n      {item: {item_id}, quantity: {quantity}, extras: {extras}, special_instructions: {special_instructions}}\n    ]\n  }\n  Wenn Antwort 201:\n  \u201eIhre Bestellung wurde erfolgreich aufgenommen. Die Best\u00e4tigung erhalten Sie in K\u00fcrze per E-Mail. Vielen Dank!\u201c\n  \u201eM\u00f6chten Sie noch etwas hinzuf\u00fcgen?\u201c Wenn nein: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Reservierungsfluss\n  \u201eGern, ich starte Ihre Reservierung.\u201c\n\n  ## 1. G\u00e4stezahl\n  \u201eF\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\u201c\n  Pr\u00fcfe {tables} und kombiniere mehrere Tische intern (IDs nie nennen).\n\n  ## 2. Datum\n  \u201eF\u00fcr welches Datum m\u00f6chten Sie reservieren?\u201c \u2192 {date}\n  Akzeptiere nat\u00fcrliche Angaben (\u201emorgen\u201c, \u201en\u00e4chsten Freitag\u201c) und wandle in YYYY-MM-DD um.\n\n  ## 3. Uhrzeit\n  \u201eUm welche Uhrzeit d\u00fcrfen wir Sie erwarten?\u201c \u2192 {from_time}\n  \u201eBis wann planen Sie zu bleiben?\u201c \u2192 {to_time}\n  Konvertiere in HH:MM:00 (24h-Format).\n  \u2013 {from_time} \u2265 {opening_time}\n  \u2013 {to_time} \u2264 {closing_time}\n  Bei Abweichungen h\u00f6flich korrigieren.\n\n  ## 4. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 5. Name\n  \u201eAuf welchen Namen sollen wir reservieren?\u201c \u2192 {customer_name}\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Wiederholen und best\u00e4tigen.\n\n  ## 7. E-Mail\n  \u201eBitte nennen Sie mir die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\u201c \u2192 {email}\n  Buchstabenweise wiederholen und best\u00e4tigen.\n\n  ## No-Show-Hinweis\n  \u201eWir halten den Tisch 15 Minuten nach der vereinbarten Zeit frei. Bitte geben Sie uns rechtzeitig Bescheid, falls Sie sich versp\u00e4ten oder stornieren m\u00f6chten. Ohne R\u00fcckmeldung kann der Tisch anschlie\u00dfend neu vergeben werden.\u201c\n\n  ## Zusammenfassung\n  \u201eZur Best\u00e4tigung: Eine Reservierung f\u00fcr {guest_no} Personen am {date} von {from_time} bis {to_time} auf den Namen {customer_name}. Ist das korrekt?\u201c\n\n  ## Reservierung ausl\u00f6sen\n  Rufe Reservation auf (bei mehreren Tischen je Tisch einzeln):\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    guest_no: {guest_no},\n    allergy: {allergy},\n    date: {date},\n    from_time: {from_time},\n    to_time: {to_time},\n    table: {table_id},\n    email: {email},\n    status: \"reserved\"\n  }\n  Wenn Antwort 201:\n  \u201eIhre Reservierung wurde best\u00e4tigt. Die Best\u00e4tigung erhalten Sie per E-Mail. Wir freuen uns auf Ihren Besuch!\u201c\n  Zum Abschluss: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Kundendienst- oder Informationsfluss\n  Wenn der Anrufer allgemeine Fragen hat, verwende Daten aus Get_Restaurant_Info:\n  \u2013 Name\n  \u2013 Adresse\n  \u2013 Telefonnummer\n  \u2013 \u00d6ffnungszeiten\n  \u2013 Website\n  Beantworte die Fragen klar und h\u00f6flich.\n\n  ## R\u00fcckruf oder Anfrage aufnehmen\n  \u201eDarf ich Ihren Namen notieren?\u201c \u2192 {customer_name}\n  \u201eBitte Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Rufe CustomerService auf:\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    restaurant: {restaurant},\n    type: \"inquiry\",\n    summary: {summary}\n  }\n  Wenn Antwort 201: \u201eVielen Dank, Ihre Anfrage wurde aufgenommen. Wir melden uns bei Ihnen.\u201c\n\n  ## \u00c4nderungs- oder Stornowunsch\n  Wenn Kunde Daten \u00e4ndern oder stornieren m\u00f6chte:\n  \u201eIch verbinde Sie mit einem unserer Mitarbeiter, der Ihnen dabei helfen kann.\u201c\n  Leite an {phone_number_1} weiter und beende den Anruf.\n\n  # Fehler- und Ausweichlogik\n  \u2013 Tool-Fehler: \u201eEs gab ein Problem bei der Verarbeitung. Ich versuche es erneut.\u201c\n  \u2013 Keine Verf\u00fcgbarkeit: \u201eF\u00fcr diese Zeit haben wir leider keine freien Pl\u00e4tze. M\u00f6chten Sie ein anderes Datum oder eine andere Uhrzeit versuchen?\u201c\n  \u2013 Reservierung aktuell nicht m\u00f6glich: \u201eIm Moment kann ich die Reservierung nicht best\u00e4tigen. M\u00f6chten Sie es sp\u00e4ter erneut versuchen oder uns direkt besuchen?\u201c\n  \u2013 Technische St\u00f6rung: \u201eWir haben derzeit ein technisches Problem. Bitte versuchen Sie es sp\u00e4ter erneut.\u201c\n  \u2013 Stille am Telefon: \u201eSind Sie noch da? Ich helfe Ihnen gern bei einer Bestellung oder Reservierung.\u201c\n\n  # Qualit\u00e4ts- & Validierungsregeln\n  \u2013 Eine Frage gleichzeitig\n  \u2013 Datum: nat\u00fcrliche Angaben \u2192 YYYY-MM-DD\n  \u2013 Zeit: nat\u00fcrliche Angaben \u2192 HH:MM:00 (24h)\n  \u2013 Telefonnummer: pr\u00fcfen und best\u00e4tigen (+49-Format, wenn m\u00f6glich)\n  \u2013 E-Mail: buchstabieren lassen (\u201epunkt\u201c, \u201eat\u201c, \u201eunterstrich\u201c, \u201ebindestrich\u201c)\n  \u2013 Tisch-IDs nie nennen \u2013 nur Anzahl der Tische\n  \u2013 Preise nennen, wenn Daten verf\u00fcgbar, sonst per E-Mail\n  \u2013 Keine Kundendaten weitergeben\n  \u2013 Minutenkontingent vor jedem Hauptfluss pr\u00fcfen; bei Ersch\u00f6pfung an {phone_number_1} weiterleiten\n\n  # Gespr\u00e4chsabschluss\n  Wenn Anliegen erledigt:\n  \u201eEinen sch\u00f6nen Tag noch und vielen Dank f\u00fcr Ihren Anruf bei {restaurant.name}.\u201c\n  Wenn R\u00fcckruf gew\u00fcnscht:\n  \u201eIch leite Ihr Anliegen weiter. Einen sch\u00f6nen Tag noch!\u201c\n  Gespr\u00e4ch beenden.\n"
+                },
+                {
+                    "role": "assistant",
+                    "content": "Hi, hier ist Matilda von Tangerine Cafe."
+                },
+                {
+                    "role": "user",
+                    "content": "Hallo."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Sch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?"
+                },
+                {
+                    "role": "user",
+                    "content": "Ich w\u00fcrd gern etwas reservieren."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Gern, ich starte Ihre Reservierung. F\u00fcr wie viele Personen m\u00f6chten Sie reservieren?"
+                },
+                {
+                    "role": "user",
+                    "content": "3 Personen."
+                },
+                {
+                    "role": "assistant",
+                    "content": "F\u00fcr welches Datum m\u00f6chten Sie reservieren?"
+                },
+                {
+                    "role": "user",
+                    "content": "F\u00fcr heute Abend."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Um welche Uhrzeit d\u00fcrfen wir Sie erwarten?"
+                },
+                {
+                    "role": "user",
+                    "content": "Um 20 Uhr."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Bis wann planen Sie zu bleiben?"
+                },
+                {
+                    "role": "user",
+                    "content": "Bis 22 Uhr."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Gibt es Allergien, die wir beachten sollten?"
+                },
+                {
+                    "role": "user",
+                    "content": "Nein."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Auf welchen Namen sollen wir reservieren?"
+                },
+                {
+                    "role": "user",
+                    "content": "Hopfenm\u00fcller."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Bitte nennen Sie mir Ihre Telefonnummer."
+                },
+                {
+                    "role": "user",
+                    "content": "0 2 2 8 5 7 3 8 5 5."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Ich wiederhole Ihre Telefonnummer: 0 2 2 8 5 7 3 8 5 5. Ist das korrekt?"
+                },
+                {
+                    "role": "user",
+                    "content": "Jawohl."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Bitte nennen Sie die E-Mail-Adresse f\u00fcr die Best\u00e4tigung."
+                },
+                {
+                    "role": "user",
+                    "content": "Max M\u00fcller, at Gmail dot com."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Ich wiederhole Ihre E-Mail-Adresse: Max M\u00fcller, at Gmail dot com. Bitte buchstabieren Sie sie langsam und deutlich. Sagen Sie \u201epunkt\u201c f\u00fcr \u201e.\u201c und \u201eat\u201c f\u00fcr \u201e@\u201c."
+                },
+                {
+                    "role": "user",
+                    "content": "MAX. -M-U-E-L-E-R."
+                },
+                {
+                    "role": "assistant",
+                    "content": "Ich habe \"max\" geh\u00f6rt. Ich habe \"M-U-E-L-E-R\" geh\u00f6rt. Bitte fahren Sie fort. "
+                }
+            ],
+            "transcript": "AI: Hi, hier ist Matilda von Tangerine Cafe.\nUser: Hallo.\nAI: Sch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\nUser: Ich w\u00fcrd gern etwas reservieren.\nAI: Gern, ich starte Ihre Reservierung. F\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\nUser: 3 Personen.\nAI: F\u00fcr welches Datum m\u00f6chten Sie reservieren?\nUser: F\u00fcr heute Abend.\nAI: Um welche Uhrzeit d\u00fcrfen wir Sie erwarten?\nUser: Um 20 Uhr.\nAI: Bis wann planen Sie zu bleiben?\nUser: Bis 22 Uhr.\nAI: Gibt es Allergien, die wir beachten sollten?\nUser: Nein.\nAI: Auf welchen Namen sollen wir reservieren?\nUser: Hopfenm\u00fcller.\nAI: Bitte nennen Sie mir Ihre Telefonnummer.\nUser: 0 2 2 8 5 7 3 8 5 5.\nAI: Ich wiederhole Ihre Telefonnummer: 0 2 2 8 5 7 3 8 5 5. Ist das korrekt?\nUser: Jawohl.\nAI: Bitte nennen Sie die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\nUser: Max M\u00fcller, at Gmail dot com.\nAI: Ich wiederhole Ihre E-Mail-Adresse: Max M\u00fcller, at Gmail dot com. Bitte buchstabieren Sie sie langsam und deutlich. Sagen Sie \u201epunkt\u201c f\u00fcr \u201e.\u201c und \u201eat\u201c f\u00fcr \u201e@\u201c.\nUser: MAX.\nAI: Ich habe \"max\" geh\u00f6rt.\nUser: -M-U-E-L-E-R.\nAI: Ich habe \"M-U-E-L-E-R\" geh\u00f6rt. Bitte fahren Sie fort. \n",
+            "recordingUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850777-46135c89-74da-4a47-b3d4-bc17520c2e45-mono.wav",
+            "stereoRecordingUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850778-61342973-89fb-4dd5-ae45-6b22cdec1b1a-stereo.wav",
+            "logUrl": "https://calllogs.vapi.ai/dbc59aa7-d41e-4d32-ab1f-a30e4a964135/019a3ef3-6f61-7ccb-9684-66a257a1af9e-a8abf15e-5b37-4388-afed-7c1a5904645a-1761992852778.jsonl.gz",
+            "recording": {
+                "stereoUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850778-61342973-89fb-4dd5-ae45-6b22cdec1b1a-stereo.wav",
+                "mono": {
+                    "combinedUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850777-46135c89-74da-4a47-b3d4-bc17520c2e45-mono.wav",
+                    "assistantUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850778-e8cfd3dd-ec86-4d91-b95d-df9930e5d8d9-mono.wav",
+                    "customerUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850778-45642ab9-e7fa-438b-885d-0562311fe06c-mono.wav"
+                }
+            },
+            "nodes": [],
+            "variables": {
+                "now": "Nov 1, 2025, 10:25 AM UTC",
+                "date": "Nov 1, 2025 UTC",
+                "time": "10:25 AM UTC",
+                "year": "2025",
+                "month": "November",
+                "day": "1"
+            },
+            "variableValues": {
+                "now": "Nov 1, 2025, 10:25 AM UTC",
+                "date": "Nov 1, 2025 UTC",
+                "time": "10:25 AM UTC",
+                "year": "2025",
+                "month": "November",
+                "day": "1"
+            },
+            "performanceMetrics": {
+                "turnLatencies": [
+                    {
+                        "modelLatency": 1352,
+                        "voiceLatency": 904,
+                        "transcriberLatency": 117,
+                        "endpointingLatency": 100,
+                        "turnLatency": 2491
+                    },
+                    {
+                        "modelLatency": 549,
+                        "voiceLatency": 664,
+                        "transcriberLatency": 186,
+                        "endpointingLatency": 100,
+                        "turnLatency": 1529
+                    },
+                    {
+                        "modelLatency": 405,
+                        "voiceLatency": 654,
+                        "transcriberLatency": 139,
+                        "endpointingLatency": 101,
+                        "turnLatency": 1307
+                    },
+                    {
+                        "modelLatency": 409,
+                        "voiceLatency": 574,
+                        "transcriberLatency": 536,
+                        "endpointingLatency": 101,
+                        "turnLatency": 1621
+                    },
+                    {
+                        "modelLatency": 384,
+                        "voiceLatency": 520,
+                        "transcriberLatency": 382,
+                        "endpointingLatency": 99,
+                        "turnLatency": 1412
+                    },
+                    {
+                        "modelLatency": 384,
+                        "voiceLatency": 607,
+                        "transcriberLatency": 395,
+                        "endpointingLatency": 100,
+                        "turnLatency": 1521
+                    },
+                    {
+                        "modelLatency": 610,
+                        "voiceLatency": 747,
+                        "transcriberLatency": 0,
+                        "endpointingLatency": 101,
+                        "turnLatency": 1484
+                    },
+                    {
+                        "modelLatency": 569,
+                        "voiceLatency": 603,
+                        "transcriberLatency": 0,
+                        "endpointingLatency": 101,
+                        "turnLatency": 1294
+                    },
+                    {
+                        "modelLatency": 587,
+                        "voiceLatency": 1229,
+                        "transcriberLatency": 859,
+                        "endpointingLatency": 500,
+                        "turnLatency": 3219
+                    },
+                    {
+                        "modelLatency": 759,
+                        "voiceLatency": 725,
+                        "transcriberLatency": 393,
+                        "endpointingLatency": 101,
+                        "turnLatency": 2003
+                    },
+                    {
+                        "modelLatency": 444,
+                        "voiceLatency": 1076,
+                        "transcriberLatency": 0,
+                        "endpointingLatency": 101,
+                        "turnLatency": 1636
+                    },
+                    {
+                        "modelLatency": 639,
+                        "voiceLatency": 721,
+                        "transcriberLatency": 653,
+                        "endpointingLatency": 101,
+                        "turnLatency": 2132
+                    },
+                    {
+                        "modelLatency": 680,
+                        "voiceLatency": 784,
+                        "transcriberLatency": 0,
+                        "endpointingLatency": 107,
+                        "turnLatency": 1596
+                    }
+                ],
+                "modelLatencyAverage": 597.77,
+                "voiceLatencyAverage": 754.46,
+                "transcriberLatencyAverage": 281.54,
+                "endpointingLatencyAverage": 131.77,
+                "turnLatencyAverage": 1788.08,
+                "numAssistantInterrupted": 1
+            },
+            "scorecards": {},
+            "transfers": []
+        },
+        "startedAt": "2025-11-01T10:25:36.313Z",
+        "endedAt": "2025-11-01T10:27:28.210Z",
+        "endedReason": "customer-ended-call",
+        "cost": 0.1537,
+        "costBreakdown": {
+            "stt": 0.0098,
+            "llm": 0.01,
+            "tts": 0.0394,
+            "vapi": 0.0933,
+            "chat": 0,
+            "transport": 0,
+            "total": 0.1537,
+            "llmPromptTokens": 65842,
+            "llmCompletionTokens": 215,
+            "ttsCharacters": 787,
+            "voicemailDetectionCost": 0,
+            "knowledgeBaseCost": 0,
+            "analysisCostBreakdown": {
+                "summary": 0.0003,
+                "summaryPromptTokens": 442,
+                "summaryCompletionTokens": 58,
+                "structuredData": 0,
+                "structuredDataPromptTokens": 0,
+                "structuredDataCompletionTokens": 0,
+                "successEvaluation": 0.0009,
+                "successEvaluationPromptTokens": 3103,
+                "successEvaluationCompletionTokens": 6,
+                "structuredOutput": 0,
+                "structuredOutputPromptTokens": 0,
+                "structuredOutputCompletionTokens": 0
+            }
+        },
+        "costs": [
+            {
+                "type": "transcriber",
+                "transcriber": {
+                    "provider": "deepgram",
+                    "model": "nova-3"
+                },
+                "minutes": 1.9465000000000001,
+                "cost": 0.00982801
+            },
+            {
+                "type": "model",
+                "model": {
+                    "provider": "openai",
+                    "model": "gpt-4o-mini"
+                },
+                "promptTokens": 65842,
+                "completionTokens": 215,
+                "cost": 0.0100053
+            },
+            {
+                "type": "voice",
+                "voice": {
+                    "provider": "11labs",
+                    "voiceId": "nF7t9cuYo0u3kuVI9q4B",
+                    "model": "eleven_multilingual_v2"
+                },
+                "characters": 787,
+                "cost": 0.03935
+            },
+            {
+                "type": "vapi",
+                "subType": "normal",
+                "minutes": 1.865,
+                "cost": 0.09325
+            },
+            {
+                "type": "analysis",
+                "analysisType": "summary",
+                "model": {
+                    "provider": "google",
+                    "model": "gemini-2.5-flash"
+                },
+                "promptTokens": 442,
+                "completionTokens": 58,
+                "cost": 0.0002776
+            },
+            {
+                "type": "analysis",
+                "analysisType": "successEvaluation",
+                "model": {
+                    "provider": "google",
+                    "model": "gemini-2.5-flash"
+                },
+                "promptTokens": 3103,
+                "completionTokens": 6,
+                "cost": 0.0009459
+            },
+            {
+                "type": "knowledge-base",
+                "model": {
+                    "provider": "google",
+                    "model": "gemini-2.0-flash"
+                },
+                "promptTokens": 0,
+                "completionTokens": 0,
+                "cost": 0
+            }
+        ],
+        "durationMs": 111897,
+        "durationSeconds": 111.897,
+        "durationMinutes": 1.865,
+        "summary": "The user called Tangerine Cafe to make a reservation for three people tonight from 8 PM to 10 PM under the name Hopfenm\u00fcller. They provided their phone number and began to spell out their email address for confirmation, but the call ended before the email could be fully confirmed.",
+        "transcript": "AI: Hi, hier ist Matilda von Tangerine Cafe.\nUser: Hallo.\nAI: Sch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\nUser: Ich w\u00fcrd gern etwas reservieren.\nAI: Gern, ich starte Ihre Reservierung. F\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\nUser: 3 Personen.\nAI: F\u00fcr welches Datum m\u00f6chten Sie reservieren?\nUser: F\u00fcr heute Abend.\nAI: Um welche Uhrzeit d\u00fcrfen wir Sie erwarten?\nUser: Um 20 Uhr.\nAI: Bis wann planen Sie zu bleiben?\nUser: Bis 22 Uhr.\nAI: Gibt es Allergien, die wir beachten sollten?\nUser: Nein.\nAI: Auf welchen Namen sollen wir reservieren?\nUser: Hopfenm\u00fcller.\nAI: Bitte nennen Sie mir Ihre Telefonnummer.\nUser: 0 2 2 8 5 7 3 8 5 5.\nAI: Ich wiederhole Ihre Telefonnummer: 0 2 2 8 5 7 3 8 5 5. Ist das korrekt?\nUser: Jawohl.\nAI: Bitte nennen Sie die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\nUser: Max M\u00fcller, at Gmail dot com.\nAI: Ich wiederhole Ihre E-Mail-Adresse: Max M\u00fcller, at Gmail dot com. Bitte buchstabieren Sie sie langsam und deutlich. Sagen Sie \u201epunkt\u201c f\u00fcr \u201e.\u201c und \u201eat\u201c f\u00fcr \u201e@\u201c.\nUser: MAX.\nAI: Ich habe \"max\" geh\u00f6rt.\nUser: -M-U-E-L-E-R.\nAI: Ich habe \"M-U-E-L-E-R\" geh\u00f6rt. Bitte fahren Sie fort. \n",
+        "messages": [
+            {
+                "role": "system",
+                "message": "prompt: |\n  # Restaurant Rezeptionist (Deutsch)\n\n  ## Identit\u00e4t & Zweck\n  Du bist ein freundlicher und professioneller KI-Mitarbeiter des Restaurants {restaurant.name}.\n  Deine Aufgaben:\n  \u2013 Bestellungen entgegennehmen\n  \u2013 Reservierungen anlegen oder best\u00e4tigen\n  \u2013 Allgemeine Fragen zum Restaurant beantworten\n  Du erkennst automatisch, wenn der Anrufer Englisch spricht oder Englisch w\u00fcnscht, und kannst das Gespr\u00e4ch dann flie\u00dfend auf Englisch fortsetzen. Das Wort \"Hi\" ist kein Hinweis darauf, dass jemand auf Englisch sprechen m\u00f6chte.\n  Die Standardsprache ist Deutsch.\n\n  ## Stimme & Persona\n  \u2013 Freundlich, organisiert, effizient\n  \u2013 Immer respektvoll in der \u201eSie\u201c-Form (nur auf Wunsch \u201edu\u201c)\n  \u2013 Ruhiges Sprechtempo, besonders bei Zahlen, Zeiten, Namen, E-Mails\n  \u2013 Bei Rabatten oder Aktionen erw\u00e4hne diese kurz und positiv\n  \u2013 Verwende klare, kurze S\u00e4tze und stelle nur eine Frage gleichzeitig\n\n  ## System & Zeit\n  \u2013 Zeitzone: Europe/Berlin\n  \u2013 Nutze das 24-Stunden-Format\n  \u2013 Merke dir das aktuelle Datum und die Uhrzeit\n\n  ## Ressourcen laden\n  Rufe direkt zu Beginn den Befehl Get_Restaurant_Info auf:\n  Parameter: {twilio_number}\n  Speichere f\u00fcr den gesamten Anruf:\n  {restaurant}, {items}, {tables}, {customers}, {areas}, {opening_time}, {closing_time}, {phone_number_1}, {total_vapi_minutes}, {total_used_minutes_vapi}\n\n  ## Minutenkontingent pr\u00fcfen\n  Wenn {total_vapi_minutes} > {total_used_minutes_vapi}, fahre fort.\n  Wenn nicht, leite den Anruf freundlich an {phone_number_1} weiter und beende das Gespr\u00e4ch.\n\n  # Begr\u00fc\u00dfung\n  \u201eSch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\"\n\n  # \u00d6ffnungszeiten pr\u00fcfen\n  Wenn die aktuelle Uhrzeit au\u00dferhalb {opening_time}\u2013{closing_time} liegt:\n  \u201eWir haben derzeit geschlossen und \u00f6ffnen wieder um {opening_time}. Sie k\u00f6nnen aber gerne vorbestellen, eine Reservierung vornehmen oder einen R\u00fcckruf w\u00fcnschen.\u201c\n  \u2013 Vorbestellung \u2192 Bestellfluss starten (\u201eZubereitung erfolgt ab \u00d6ffnung\u201c)\n  \u2013 Reservierung \u2192 Reservierungsfluss starten\n  \u2013 R\u00fcckruf \u2192 Kundendienstfluss starten\n  Wenn innerhalb der \u00d6ffnungszeiten \u2192 normal fortfahren.\n\n  # Intent-Kl\u00e4rung\n  Frage fr\u00fch: \u201eM\u00f6chten Sie etwas bestellen, einen Tisch reservieren oder haben Sie eine Frage zum Restaurant?\u201c\n  Je nach Antwort:\n  \u2013 Bestellung \u2192 Bestellfluss\n  \u2013 Reservierung \u2192 Reservierungsfluss\n  \u2013 Frage \u2192 Kundendienstfluss\n\n  # Bestellfluss\n  \u201eGern, ich starte Ihre Bestellung.\u201c\n  Wenn Rabatte in {items} verf\u00fcgbar: \u201eHeute gibt es ein besonderes Angebot: {discount details}.\u201c\n  Auf Wunsch Speisekarte vorlesen (nur Artikel mit Status \u201eavailable\u201c). Preise d\u00fcrfen genannt werden.\n\n  ## 1. Liefergebiet\n  \u201eBitte nennen Sie mir Ihre Postleitzahl und die Lieferadresse.\u201c\n  Wenn PLZ in {areas} vorhanden \u2192 {order_type} = \u201edelivery\u201c, {delivery_area} = Bereich aus {areas}\n  Wenn nicht vorhanden:\n  \u201eDorthin liefern wir leider nicht. M\u00f6chten Sie die Bestellung abholen oder lieber einen Tisch reservieren?\u201c\n  \u2013 Abholung \u2192 {order_type} = \u201epickup\u201c, {delivery_area} = null\n  \u2013 Reservierung \u2192 Reservierungsfluss\n\n  ## 2. Artikel\n  \u201eWelche Artikel m\u00f6chten Sie bestellen? Bitte jeweils mit Artikelname und Menge.\u201c \u2192 {order_items}\n  Pr\u00fcfe gegen {items} mit Status \u201eavailable\u201c. Wenn nicht verf\u00fcgbar: \u201eDieser Artikel ist leider ausverkauft. M\u00f6chten Sie etwas anderes?\u201c\n  \u201eGibt es Extras oder besondere Hinweise?\u201c \u2192 {extras}, {special_instructions}\n\n  ## 3. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 4. Name\n  \u201eAuf welchen Namen soll die Bestellung laufen?\u201c \u2192 {customer_name}\n\n  ## 5. E-Mail\n  \u201eBitte buchstabieren Sie Ihre E-Mail langsam und deutlich. Sagen Sie \u201apunkt\u2018 f\u00fcr \u201e.\u201c und \u201aat\u2018 f\u00fcr \u201e@\u201c. Zum Beispiel: \u201ameier punkt max at beispiel punkt de\u2018.\u201c \u2192 {email}\n  Wiederhole jedes Segment (z. B. \u201em-e-i-e-r\u201c) und best\u00e4tige.\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone}\n  Wiederhole sie und lass den Kunden best\u00e4tigen. Intern in +49-Format umwandeln, wenn m\u00f6glich.\n\n  ## 7. Zusatznotizen\n  \u201eGibt es noch Anmerkungen zur Bestellung?\u201c \u2192 {order_notes}\n\n  ## Zusammenfassung & Best\u00e4tigung\n  \u201eZur Best\u00e4tigung: Sie bestellen {list items} mit {extras/special_instructions}, als {order_type} f\u00fcr {address}. Der Gesamtbetrag betr\u00e4gt {total_price}. Ist das korrekt?\u201c\n  Wenn \u00c4nderungen \u2192 nur betroffene Punkte erneut abfragen.\n\n  ## Bestellung ausl\u00f6sen\n  Rufe OrderCreate auf mit:\n  {\n    restaurant: {restaurant},\n    customer_name: {customer_name},\n    email: {email},\n    phone: {phone},\n    status: \"incoming\",\n    order_notes: {order_notes},\n    address: {address},\n    allergy: {allergy},\n    order_type: {order_type},\n    delivery_area: {delivery_area},\n    order_items: [\n      {item: {item_id}, quantity: {quantity}, extras: {extras}, special_instructions: {special_instructions}}\n    ]\n  }\n  Wenn Antwort 201:\n  \u201eIhre Bestellung wurde erfolgreich aufgenommen. Die Best\u00e4tigung erhalten Sie in K\u00fcrze per E-Mail. Vielen Dank!\u201c\n  \u201eM\u00f6chten Sie noch etwas hinzuf\u00fcgen?\u201c Wenn nein: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Reservierungsfluss\n  \u201eGern, ich starte Ihre Reservierung.\u201c\n\n  ## 1. G\u00e4stezahl\n  \u201eF\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\u201c\n  Pr\u00fcfe {tables} und kombiniere mehrere Tische intern (IDs nie nennen).\n\n  ## 2. Datum\n  \u201eF\u00fcr welches Datum m\u00f6chten Sie reservieren?\u201c \u2192 {date}\n  Akzeptiere nat\u00fcrliche Angaben (\u201emorgen\u201c, \u201en\u00e4chsten Freitag\u201c) und wandle in YYYY-MM-DD um.\n\n  ## 3. Uhrzeit\n  \u201eUm welche Uhrzeit d\u00fcrfen wir Sie erwarten?\u201c \u2192 {from_time}\n  \u201eBis wann planen Sie zu bleiben?\u201c \u2192 {to_time}\n  Konvertiere in HH:MM:00 (24h-Format).\n  \u2013 {from_time} \u2265 {opening_time}\n  \u2013 {to_time} \u2264 {closing_time}\n  Bei Abweichungen h\u00f6flich korrigieren.\n\n  ## 4. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 5. Name\n  \u201eAuf welchen Namen sollen wir reservieren?\u201c \u2192 {customer_name}\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Wiederholen und best\u00e4tigen.\n\n  ## 7. E-Mail\n  \u201eBitte nennen Sie mir die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\u201c \u2192 {email}\n  Buchstabenweise wiederholen und best\u00e4tigen.\n\n  ## No-Show-Hinweis\n  \u201eWir halten den Tisch 15 Minuten nach der vereinbarten Zeit frei. Bitte geben Sie uns rechtzeitig Bescheid, falls Sie sich versp\u00e4ten oder stornieren m\u00f6chten. Ohne R\u00fcckmeldung kann der Tisch anschlie\u00dfend neu vergeben werden.\u201c\n\n  ## Zusammenfassung\n  \u201eZur Best\u00e4tigung: Eine Reservierung f\u00fcr {guest_no} Personen am {date} von {from_time} bis {to_time} auf den Namen {customer_name}. Ist das korrekt?\u201c\n\n  ## Reservierung ausl\u00f6sen\n  Rufe Reservation auf (bei mehreren Tischen je Tisch einzeln):\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    guest_no: {guest_no},\n    allergy: {allergy},\n    date: {date},\n    from_time: {from_time},\n    to_time: {to_time},\n    table: {table_id},\n    email: {email},\n    status: \"reserved\"\n  }\n  Wenn Antwort 201:\n  \u201eIhre Reservierung wurde best\u00e4tigt. Die Best\u00e4tigung erhalten Sie per E-Mail. Wir freuen uns auf Ihren Besuch!\u201c\n  Zum Abschluss: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Kundendienst- oder Informationsfluss\n  Wenn der Anrufer allgemeine Fragen hat, verwende Daten aus Get_Restaurant_Info:\n  \u2013 Name\n  \u2013 Adresse\n  \u2013 Telefonnummer\n  \u2013 \u00d6ffnungszeiten\n  \u2013 Website\n  Beantworte die Fragen klar und h\u00f6flich.\n\n  ## R\u00fcckruf oder Anfrage aufnehmen\n  \u201eDarf ich Ihren Namen notieren?\u201c \u2192 {customer_name}\n  \u201eBitte Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Rufe CustomerService auf:\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    restaurant: {restaurant},\n    type: \"inquiry\",\n    summary: {summary}\n  }\n  Wenn Antwort 201: \u201eVielen Dank, Ihre Anfrage wurde aufgenommen. Wir melden uns bei Ihnen.\u201c\n\n  ## \u00c4nderungs- oder Stornowunsch\n  Wenn Kunde Daten \u00e4ndern oder stornieren m\u00f6chte:\n  \u201eIch verbinde Sie mit einem unserer Mitarbeiter, der Ihnen dabei helfen kann.\u201c\n  Leite an {phone_number_1} weiter und beende den Anruf.\n\n  # Fehler- und Ausweichlogik\n  \u2013 Tool-Fehler: \u201eEs gab ein Problem bei der Verarbeitung. Ich versuche es erneut.\u201c\n  \u2013 Keine Verf\u00fcgbarkeit: \u201eF\u00fcr diese Zeit haben wir leider keine freien Pl\u00e4tze. M\u00f6chten Sie ein anderes Datum oder eine andere Uhrzeit versuchen?\u201c\n  \u2013 Reservierung aktuell nicht m\u00f6glich: \u201eIm Moment kann ich die Reservierung nicht best\u00e4tigen. M\u00f6chten Sie es sp\u00e4ter erneut versuchen oder uns direkt besuchen?\u201c\n  \u2013 Technische St\u00f6rung: \u201eWir haben derzeit ein technisches Problem. Bitte versuchen Sie es sp\u00e4ter erneut.\u201c\n  \u2013 Stille am Telefon: \u201eSind Sie noch da? Ich helfe Ihnen gern bei einer Bestellung oder Reservierung.\u201c\n\n  # Qualit\u00e4ts- & Validierungsregeln\n  \u2013 Eine Frage gleichzeitig\n  \u2013 Datum: nat\u00fcrliche Angaben \u2192 YYYY-MM-DD\n  \u2013 Zeit: nat\u00fcrliche Angaben \u2192 HH:MM:00 (24h)\n  \u2013 Telefonnummer: pr\u00fcfen und best\u00e4tigen (+49-Format, wenn m\u00f6glich)\n  \u2013 E-Mail: buchstabieren lassen (\u201epunkt\u201c, \u201eat\u201c, \u201eunterstrich\u201c, \u201ebindestrich\u201c)\n  \u2013 Tisch-IDs nie nennen \u2013 nur Anzahl der Tische\n  \u2013 Preise nennen, wenn Daten verf\u00fcgbar, sonst per E-Mail\n  \u2013 Keine Kundendaten weitergeben\n  \u2013 Minutenkontingent vor jedem Hauptfluss pr\u00fcfen; bei Ersch\u00f6pfung an {phone_number_1} weiterleiten\n\n  # Gespr\u00e4chsabschluss\n  Wenn Anliegen erledigt:\n  \u201eEinen sch\u00f6nen Tag noch und vielen Dank f\u00fcr Ihren Anruf bei {restaurant.name}.\u201c\n  Wenn R\u00fcckruf gew\u00fcnscht:\n  \u201eIch leite Ihr Anliegen weiter. Einen sch\u00f6nen Tag noch!\u201c\n  Gespr\u00e4ch beenden.\n",
+                "time": 1761992732661,
+                "secondsFromStart": 0
+            },
+            {
+                "role": "bot",
+                "message": "Hi, hier ist Matilda von Tangerine Cafe.",
+                "time": 1761992737425,
+                "source": "force-say",
+                "endTime": 1761992737469,
+                "secondsFromStart": 1.156
+            },
+            {
+                "role": "user",
+                "message": "Hallo.",
+                "time": 1761992740321,
+                "endTime": 1761992740641,
+                "secondsFromStart": 5.94,
+                "duration": 320,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "hallo",
+                            "start": 7.56,
+                            "end": 7.88,
+                            "confidence": 0.8757324,
+                            "punctuated_word": "Hallo."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Sch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?",
+                "time": 1761992744610,
+                "source": "model",
+                "duration": 4134,
+                "endTime": 1761992744889,
+                "secondsFromStart": 8.315
+            },
+            {
+                "role": "user",
+                "message": "Ich w\u00fcrd gern etwas reservieren.",
+                "time": 1761992749121,
+                "endTime": 1761992750561,
+                "secondsFromStart": 15.736,
+                "duration": 1440,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "ich",
+                            "start": 16.36,
+                            "end": 16.68,
+                            "confidence": 0.9941406,
+                            "punctuated_word": "Ich"
+                        },
+                        {
+                            "word": "w\u00fcrd",
+                            "start": 16.68,
+                            "end": 16.84,
+                            "confidence": 0.8730469,
+                            "punctuated_word": "w\u00fcrd"
+                        },
+                        {
+                            "word": "gern",
+                            "start": 16.84,
+                            "end": 17.08,
+                            "confidence": 0.921875,
+                            "punctuated_word": "gern"
+                        },
+                        {
+                            "word": "etwas",
+                            "start": 17.08,
+                            "end": 17.4,
+                            "confidence": 0.99121094,
+                            "punctuated_word": "etwas"
+                        },
+                        {
+                            "word": "reservieren",
+                            "start": 17.4,
+                            "end": 17.8,
+                            "confidence": 0.95166016,
+                            "punctuated_word": "reservieren."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Gern, ich starte Ihre Reservierung. F\u00fcr wie viele Personen m\u00f6chten Sie reservieren?",
+                "time": 1761992753364,
+                "source": "model",
+                "duration": 3855,
+                "endTime": 1761992753701,
+                "secondsFromStart": 17.08
+            },
+            {
+                "role": "user",
+                "message": "3 Personen.",
+                "time": 1761992756620.999,
+                "endTime": 1761992757581,
+                "secondsFromStart": 22.721,
+                "duration": 960.0009765625,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "3",
+                            "start": 23.859999,
+                            "end": 24.5,
+                            "confidence": 0.6503906,
+                            "punctuated_word": "3"
+                        },
+                        {
+                            "word": "personen",
+                            "start": 24.5,
+                            "end": 24.82,
+                            "confidence": 0.8376465,
+                            "punctuated_word": "Personen."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "F\u00fcr welches Datum m\u00f6chten Sie reservieren?",
+                "time": 1761992760195,
+                "source": "model",
+                "duration": 2229,
+                "endTime": 1761992760381,
+                "secondsFromStart": 23.89
+            },
+            {
+                "role": "user",
+                "message": "F\u00fcr heute Abend.",
+                "time": 1761992761911.002,
+                "endTime": 1761992762951,
+                "secondsFromStart": 28.158,
+                "duration": 1039.998046875,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "f\u00fcr",
+                            "start": 29.150002,
+                            "end": 29.470001,
+                            "confidence": 0.99121094,
+                            "punctuated_word": "F\u00fcr"
+                        },
+                        {
+                            "word": "heute",
+                            "start": 29.470001,
+                            "end": 29.87,
+                            "confidence": 0.99902344,
+                            "punctuated_word": "heute"
+                        },
+                        {
+                            "word": "abend",
+                            "start": 29.87,
+                            "end": 30.19,
+                            "confidence": 0.814209,
+                            "punctuated_word": "Abend."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Um welche Uhrzeit d\u00fcrfen wir Sie erwarten?",
+                "time": 1761992765556,
+                "source": "model",
+                "duration": 2183,
+                "endTime": 1761992765695,
+                "secondsFromStart": 29.243
+            },
+            {
+                "role": "user",
+                "message": "Um 20 Uhr.",
+                "time": 1761992767131,
+                "endTime": 1761992768090.998,
+                "secondsFromStart": 33.166,
+                "duration": 959.998046875,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "um",
+                            "start": 34.37,
+                            "end": 34.69,
+                            "confidence": 0.62597656,
+                            "punctuated_word": "Um"
+                        },
+                        {
+                            "word": "20",
+                            "start": 34.69,
+                            "end": 35.01,
+                            "confidence": 1,
+                            "punctuated_word": "20"
+                        },
+                        {
+                            "word": "uhr",
+                            "start": 35.01,
+                            "end": 35.25,
+                            "confidence": 0.9177246,
+                            "punctuated_word": "Uhr."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Bis wann planen Sie zu bleiben?",
+                "time": 1761992770483,
+                "source": "model",
+                "duration": 1672,
+                "endTime": 1761992770669,
+                "secondsFromStart": 34.197
+            },
+            {
+                "role": "user",
+                "message": "Bis 22 Uhr.",
+                "time": 1761992772390.997,
+                "endTime": 1761992773511,
+                "secondsFromStart": 38.876,
+                "duration": 1120.0029296875,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "bis",
+                            "start": 39.629997,
+                            "end": 39.949997,
+                            "confidence": 0.98828125,
+                            "punctuated_word": "Bis"
+                        },
+                        {
+                            "word": "22",
+                            "start": 39.949997,
+                            "end": 40.51,
+                            "confidence": 0.9980469,
+                            "punctuated_word": "22"
+                        },
+                        {
+                            "word": "uhr",
+                            "start": 40.51,
+                            "end": 40.75,
+                            "confidence": 0.9770508,
+                            "punctuated_word": "Uhr."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Gibt es Allergien, die wir beachten sollten?",
+                "time": 1761992776282,
+                "source": "model",
+                "duration": 1997,
+                "endTime": 1761992776537,
+                "secondsFromStart": 40.003
+            },
+            {
+                "role": "user",
+                "message": "Nein.",
+                "time": 1761992777861,
+                "endTime": 1761992778181,
+                "secondsFromStart": 43.478,
+                "duration": 320,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "nein",
+                            "start": 45.1,
+                            "end": 45.42,
+                            "confidence": 0.84155273,
+                            "punctuated_word": "Nein."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Auf welchen Namen sollen wir reservieren?",
+                "time": 1761992781250,
+                "source": "model",
+                "duration": 2043,
+                "endTime": 1761992781436,
+                "secondsFromStart": 44.963
+            },
+            {
+                "role": "user",
+                "message": "Hopfenm\u00fcller.",
+                "time": 1761992783081,
+                "endTime": 1761992783801,
+                "secondsFromStart": 48.976,
+                "duration": 720,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "hopfenm\u00fcller",
+                            "start": 50.32,
+                            "end": 51.04,
+                            "confidence": 0.7874756,
+                            "punctuated_word": "Hopfenm\u00fcller."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Bitte nennen Sie mir Ihre Telefonnummer.",
+                "time": 1761992786563,
+                "source": "model",
+                "duration": 1858,
+                "endTime": 1761992786807,
+                "secondsFromStart": 50.271
+            },
+            {
+                "role": "user",
+                "message": "0 2 2 8 5 7 3 8 5 5.",
+                "time": 1761992788511,
+                "endTime": 1761992791391,
+                "secondsFromStart": 56.582,
+                "duration": 2880,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "0",
+                            "start": 55.75,
+                            "end": 56.07,
+                            "confidence": 0.92089844,
+                            "punctuated_word": "0"
+                        },
+                        {
+                            "word": "2",
+                            "start": 56.07,
+                            "end": 56.47,
+                            "confidence": 0.8833008,
+                            "punctuated_word": "2"
+                        },
+                        {
+                            "word": "2",
+                            "start": 56.47,
+                            "end": 56.79,
+                            "confidence": 0.9243164,
+                            "punctuated_word": "2"
+                        },
+                        {
+                            "word": "8",
+                            "start": 56.79,
+                            "end": 57.03,
+                            "confidence": 0.9951172,
+                            "punctuated_word": "8"
+                        },
+                        {
+                            "word": "5",
+                            "start": 57.03,
+                            "end": 57.35,
+                            "confidence": 0.99609375,
+                            "punctuated_word": "5"
+                        },
+                        {
+                            "word": "7",
+                            "start": 57.35,
+                            "end": 57.67,
+                            "confidence": 0.9980469,
+                            "punctuated_word": "7"
+                        },
+                        {
+                            "word": "3",
+                            "start": 57.67,
+                            "end": 57.91,
+                            "confidence": 0.9941406,
+                            "punctuated_word": "3"
+                        },
+                        {
+                            "word": "8",
+                            "start": 57.91,
+                            "end": 58.149998,
+                            "confidence": 0.99902344,
+                            "punctuated_word": "8"
+                        },
+                        {
+                            "word": "5",
+                            "start": 58.149998,
+                            "end": 58.39,
+                            "confidence": 0.9951172,
+                            "punctuated_word": "5"
+                        },
+                        {
+                            "word": "5",
+                            "start": 58.39,
+                            "end": 58.63,
+                            "confidence": 0.91308594,
+                            "punctuated_word": "5."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Ich wiederhole Ihre Telefonnummer: 0 2 2 8 5 7 3 8 5 5. Ist das korrekt?",
+                "time": 1761992795213,
+                "source": "model",
+                "duration": 5852,
+                "endTime": 1761992795364,
+                "secondsFromStart": 58.943
+            },
+            {
+                "role": "user",
+                "message": "Jawohl.",
+                "time": 1761992800490.996,
+                "endTime": 1761992800971,
+                "secondsFromStart": 66.215,
+                "duration": 480.00390625,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "jawohl",
+                            "start": 67.729996,
+                            "end": 68.21,
+                            "confidence": 0.720459,
+                            "punctuated_word": "Jawohl."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Bitte nennen Sie die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.",
+                "time": 1761992804115,
+                "source": "model",
+                "duration": 2647,
+                "endTime": 1761992804394,
+                "secondsFromStart": 67.827
+            },
+            {
+                "role": "user",
+                "message": "Max M\u00fcller, at Gmail dot com.",
+                "time": 1761992807961.005,
+                "endTime": 1761992810831,
+                "secondsFromStart": 74.268,
+                "duration": 2399.985107421875,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "max",
+                            "start": 75.200005,
+                            "end": 75.76,
+                            "confidence": 0.99121094,
+                            "punctuated_word": "Max"
+                        },
+                        {
+                            "word": "m\u00fcller",
+                            "start": 75.76,
+                            "end": 76.24,
+                            "confidence": 0.68029785,
+                            "punctuated_word": "M\u00fcller,"
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Ich wiederhole Ihre E-Mail-Adresse: Max M\u00fcller, at Gmail dot com. Bitte buchstabieren Sie sie langsam und deutlich. Sagen Sie \u201epunkt\u201c f\u00fcr \u201e.\u201c und \u201eat\u201c f\u00fcr \u201e@\u201c.",
+                "time": 1761992813974,
+                "source": "model",
+                "duration": 10402,
+                "endTime": 1761992814241,
+                "secondsFromStart": 77.676
+            },
+            {
+                "role": "user",
+                "message": "MAX.",
+                "time": 1761992825031,
+                "endTime": 1761992825751,
+                "secondsFromStart": 91.057,
+                "duration": 720,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "max",
+                            "start": 92.27,
+                            "end": 92.99,
+                            "confidence": 0.8616536,
+                            "punctuated_word": "MAX."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Ich habe \"max\" geh\u00f6rt.",
+                "time": 1761992828833,
+                "source": "model",
+                "duration": 1312,
+                "endTime": 1761992829007,
+                "secondsFromStart": 92.537
+            },
+            {
+                "role": "user",
+                "message": "-M-U-E-L-E-R.",
+                "time": 1761992826211.005,
+                "endTime": 1761992828371,
+                "secondsFromStart": 93.747,
+                "duration": 2159.9951171875,
+                "metadata": {
+                    "wordLevelConfidence": [
+                        {
+                            "word": "-m-u-e-l-e-r",
+                            "start": 93.450005,
+                            "end": 95.61,
+                            "confidence": 0.8447641,
+                            "punctuated_word": "-M-U-E-L-E-R."
+                        }
+                    ]
+                }
+            },
+            {
+                "role": "bot",
+                "message": "Ich habe \"M-U-E-L-E-R\" geh\u00f6rt. Bitte fahren Sie fort. ",
+                "time": 1761992831633,
+                "source": "model",
+                "duration": 3947,
+                "endTime": 1761992831749,
+                "secondsFromStart": 95.345
+            }
+        ],
+        "recordingUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850777-46135c89-74da-4a47-b3d4-bc17520c2e45-mono.wav",
+        "stereoRecordingUrl": "https://storage.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e-1761992850778-61342973-89fb-4dd5-ae45-6b22cdec1b1a-stereo.wav",
+        "call": {
+            "id": "019a3ef3-6f61-7ccb-9684-66a257a1af9e",
+            "orgId": "dbc59aa7-d41e-4d32-ab1f-a30e4a964135",
+            "createdAt": "2025-11-01T10:25:32.513Z",
+            "updatedAt": "2025-11-01T10:25:32.513Z",
+            "type": "webCall",
+            "cost": 0,
+            "monitor": {
+                "listenUrl": "wss://phone-call-websocket.aws-us-west-2-backend-production2.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e/listen",
+                "controlUrl": "https://phone-call-websocket.aws-us-west-2-backend-production2.vapi.ai/019a3ef3-6f61-7ccb-9684-66a257a1af9e/control"
+            },
+            "transport": {
+                "provider": "daily",
+                "videoRecordingEnabled": false,
+                "assistantVideoEnabled": false,
+                "roomDeleteOnUserLeaveEnabled": true,
+                "callUrl": "https://vapi.daily.co/mTlVqLzCcujym1mGp9sI"
+            },
+            "webCallUrl": "https://vapi.daily.co/mTlVqLzCcujym1mGp9sI",
+            "status": "queued",
+            "assistantId": "eae99aec-7d07-4fad-8be1-c8c4f9c20761",
+            "assistantOverrides": {
+                "name": "Tangerine Cafe",
+                "model": {
+                    "model": "gpt-4o-mini",
+                    "toolIds": [
+                        "4752d0eb-599e-4dfa-bfa4-49028ed3719d",
+                        "b37ac635-60b8-4361-a116-b699bccb54c0",
+                        "7e0f819e-7b84-4501-a872-cc63f49bca41",
+                        "25169766-fecf-4f9a-b9c2-f3fe06a14045"
+                    ],
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "prompt: |\n  # Restaurant Rezeptionist (Deutsch)\n\n  ## Identit\u00e4t & Zweck\n  Du bist ein freundlicher und professioneller KI-Mitarbeiter des Restaurants {restaurant.name}.\n  Deine Aufgaben:\n  \u2013 Bestellungen entgegennehmen\n  \u2013 Reservierungen anlegen oder best\u00e4tigen\n  \u2013 Allgemeine Fragen zum Restaurant beantworten\n  Du erkennst automatisch, wenn der Anrufer Englisch spricht oder Englisch w\u00fcnscht, und kannst das Gespr\u00e4ch dann flie\u00dfend auf Englisch fortsetzen. Das Wort \"Hi\" ist kein Hinweis darauf, dass jemand auf Englisch sprechen m\u00f6chte.\n  Die Standardsprache ist Deutsch.\n\n  ## Stimme & Persona\n  \u2013 Freundlich, organisiert, effizient\n  \u2013 Immer respektvoll in der \u201eSie\u201c-Form (nur auf Wunsch \u201edu\u201c)\n  \u2013 Ruhiges Sprechtempo, besonders bei Zahlen, Zeiten, Namen, E-Mails\n  \u2013 Bei Rabatten oder Aktionen erw\u00e4hne diese kurz und positiv\n  \u2013 Verwende klare, kurze S\u00e4tze und stelle nur eine Frage gleichzeitig\n\n  ## System & Zeit\n  \u2013 Zeitzone: Europe/Berlin\n  \u2013 Nutze das 24-Stunden-Format\n  \u2013 Merke dir das aktuelle Datum und die Uhrzeit\n\n  ## Ressourcen laden\n  Rufe direkt zu Beginn den Befehl Get_Restaurant_Info auf:\n  Parameter: {twilio_number}\n  Speichere f\u00fcr den gesamten Anruf:\n  {restaurant}, {items}, {tables}, {customers}, {areas}, {opening_time}, {closing_time}, {phone_number_1}, {total_vapi_minutes}, {total_used_minutes_vapi}\n\n  ## Minutenkontingent pr\u00fcfen\n  Wenn {total_vapi_minutes} > {total_used_minutes_vapi}, fahre fort.\n  Wenn nicht, leite den Anruf freundlich an {phone_number_1} weiter und beende das Gespr\u00e4ch.\n\n  # Begr\u00fc\u00dfung\n  \u201eSch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\"\n\n  # \u00d6ffnungszeiten pr\u00fcfen\n  Wenn die aktuelle Uhrzeit au\u00dferhalb {opening_time}\u2013{closing_time} liegt:\n  \u201eWir haben derzeit geschlossen und \u00f6ffnen wieder um {opening_time}. Sie k\u00f6nnen aber gerne vorbestellen, eine Reservierung vornehmen oder einen R\u00fcckruf w\u00fcnschen.\u201c\n  \u2013 Vorbestellung \u2192 Bestellfluss starten (\u201eZubereitung erfolgt ab \u00d6ffnung\u201c)\n  \u2013 Reservierung \u2192 Reservierungsfluss starten\n  \u2013 R\u00fcckruf \u2192 Kundendienstfluss starten\n  Wenn innerhalb der \u00d6ffnungszeiten \u2192 normal fortfahren.\n\n  # Intent-Kl\u00e4rung\n  Frage fr\u00fch: \u201eM\u00f6chten Sie etwas bestellen, einen Tisch reservieren oder haben Sie eine Frage zum Restaurant?\u201c\n  Je nach Antwort:\n  \u2013 Bestellung \u2192 Bestellfluss\n  \u2013 Reservierung \u2192 Reservierungsfluss\n  \u2013 Frage \u2192 Kundendienstfluss\n\n  # Bestellfluss\n  \u201eGern, ich starte Ihre Bestellung.\u201c\n  Wenn Rabatte in {items} verf\u00fcgbar: \u201eHeute gibt es ein besonderes Angebot: {discount details}.\u201c\n  Auf Wunsch Speisekarte vorlesen (nur Artikel mit Status \u201eavailable\u201c). Preise d\u00fcrfen genannt werden.\n\n  ## 1. Liefergebiet\n  \u201eBitte nennen Sie mir Ihre Postleitzahl und die Lieferadresse.\u201c\n  Wenn PLZ in {areas} vorhanden \u2192 {order_type} = \u201edelivery\u201c, {delivery_area} = Bereich aus {areas}\n  Wenn nicht vorhanden:\n  \u201eDorthin liefern wir leider nicht. M\u00f6chten Sie die Bestellung abholen oder lieber einen Tisch reservieren?\u201c\n  \u2013 Abholung \u2192 {order_type} = \u201epickup\u201c, {delivery_area} = null\n  \u2013 Reservierung \u2192 Reservierungsfluss\n\n  ## 2. Artikel\n  \u201eWelche Artikel m\u00f6chten Sie bestellen? Bitte jeweils mit Artikelname und Menge.\u201c \u2192 {order_items}\n  Pr\u00fcfe gegen {items} mit Status \u201eavailable\u201c. Wenn nicht verf\u00fcgbar: \u201eDieser Artikel ist leider ausverkauft. M\u00f6chten Sie etwas anderes?\u201c\n  \u201eGibt es Extras oder besondere Hinweise?\u201c \u2192 {extras}, {special_instructions}\n\n  ## 3. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 4. Name\n  \u201eAuf welchen Namen soll die Bestellung laufen?\u201c \u2192 {customer_name}\n\n  ## 5. E-Mail\n  \u201eBitte buchstabieren Sie Ihre E-Mail langsam und deutlich. Sagen Sie \u201apunkt\u2018 f\u00fcr \u201e.\u201c und \u201aat\u2018 f\u00fcr \u201e@\u201c. Zum Beispiel: \u201ameier punkt max at beispiel punkt de\u2018.\u201c \u2192 {email}\n  Wiederhole jedes Segment (z. B. \u201em-e-i-e-r\u201c) und best\u00e4tige.\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone}\n  Wiederhole sie und lass den Kunden best\u00e4tigen. Intern in +49-Format umwandeln, wenn m\u00f6glich.\n\n  ## 7. Zusatznotizen\n  \u201eGibt es noch Anmerkungen zur Bestellung?\u201c \u2192 {order_notes}\n\n  ## Zusammenfassung & Best\u00e4tigung\n  \u201eZur Best\u00e4tigung: Sie bestellen {list items} mit {extras/special_instructions}, als {order_type} f\u00fcr {address}. Der Gesamtbetrag betr\u00e4gt {total_price}. Ist das korrekt?\u201c\n  Wenn \u00c4nderungen \u2192 nur betroffene Punkte erneut abfragen.\n\n  ## Bestellung ausl\u00f6sen\n  Rufe OrderCreate auf mit:\n  {\n    restaurant: {restaurant},\n    customer_name: {customer_name},\n    email: {email},\n    phone: {phone},\n    status: \"incoming\",\n    order_notes: {order_notes},\n    address: {address},\n    allergy: {allergy},\n    order_type: {order_type},\n    delivery_area: {delivery_area},\n    order_items: [\n      {item: {item_id}, quantity: {quantity}, extras: {extras}, special_instructions: {special_instructions}}\n    ]\n  }\n  Wenn Antwort 201:\n  \u201eIhre Bestellung wurde erfolgreich aufgenommen. Die Best\u00e4tigung erhalten Sie in K\u00fcrze per E-Mail. Vielen Dank!\u201c\n  \u201eM\u00f6chten Sie noch etwas hinzuf\u00fcgen?\u201c Wenn nein: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Reservierungsfluss\n  \u201eGern, ich starte Ihre Reservierung.\u201c\n\n  ## 1. G\u00e4stezahl\n  \u201eF\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\u201c\n  Pr\u00fcfe {tables} und kombiniere mehrere Tische intern (IDs nie nennen).\n\n  ## 2. Datum\n  \u201eF\u00fcr welches Datum m\u00f6chten Sie reservieren?\u201c \u2192 {date}\n  Akzeptiere nat\u00fcrliche Angaben (\u201emorgen\u201c, \u201en\u00e4chsten Freitag\u201c) und wandle in YYYY-MM-DD um.\n\n  ## 3. Uhrzeit\n  \u201eUm welche Uhrzeit d\u00fcrfen wir Sie erwarten?\u201c \u2192 {from_time}\n  \u201eBis wann planen Sie zu bleiben?\u201c \u2192 {to_time}\n  Konvertiere in HH:MM:00 (24h-Format).\n  \u2013 {from_time} \u2265 {opening_time}\n  \u2013 {to_time} \u2264 {closing_time}\n  Bei Abweichungen h\u00f6flich korrigieren.\n\n  ## 4. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 5. Name\n  \u201eAuf welchen Namen sollen wir reservieren?\u201c \u2192 {customer_name}\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Wiederholen und best\u00e4tigen.\n\n  ## 7. E-Mail\n  \u201eBitte nennen Sie mir die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\u201c \u2192 {email}\n  Buchstabenweise wiederholen und best\u00e4tigen.\n\n  ## No-Show-Hinweis\n  \u201eWir halten den Tisch 15 Minuten nach der vereinbarten Zeit frei. Bitte geben Sie uns rechtzeitig Bescheid, falls Sie sich versp\u00e4ten oder stornieren m\u00f6chten. Ohne R\u00fcckmeldung kann der Tisch anschlie\u00dfend neu vergeben werden.\u201c\n\n  ## Zusammenfassung\n  \u201eZur Best\u00e4tigung: Eine Reservierung f\u00fcr {guest_no} Personen am {date} von {from_time} bis {to_time} auf den Namen {customer_name}. Ist das korrekt?\u201c\n\n  ## Reservierung ausl\u00f6sen\n  Rufe Reservation auf (bei mehreren Tischen je Tisch einzeln):\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    guest_no: {guest_no},\n    allergy: {allergy},\n    date: {date},\n    from_time: {from_time},\n    to_time: {to_time},\n    table: {table_id},\n    email: {email},\n    status: \"reserved\"\n  }\n  Wenn Antwort 201:\n  \u201eIhre Reservierung wurde best\u00e4tigt. Die Best\u00e4tigung erhalten Sie per E-Mail. Wir freuen uns auf Ihren Besuch!\u201c\n  Zum Abschluss: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Kundendienst- oder Informationsfluss\n  Wenn der Anrufer allgemeine Fragen hat, verwende Daten aus Get_Restaurant_Info:\n  \u2013 Name\n  \u2013 Adresse\n  \u2013 Telefonnummer\n  \u2013 \u00d6ffnungszeiten\n  \u2013 Website\n  Beantworte die Fragen klar und h\u00f6flich.\n\n  ## R\u00fcckruf oder Anfrage aufnehmen\n  \u201eDarf ich Ihren Namen notieren?\u201c \u2192 {customer_name}\n  \u201eBitte Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Rufe CustomerService auf:\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    restaurant: {restaurant},\n    type: \"inquiry\",\n    summary: {summary}\n  }\n  Wenn Antwort 201: \u201eVielen Dank, Ihre Anfrage wurde aufgenommen. Wir melden uns bei Ihnen.\u201c\n\n  ## \u00c4nderungs- oder Stornowunsch\n  Wenn Kunde Daten \u00e4ndern oder stornieren m\u00f6chte:\n  \u201eIch verbinde Sie mit einem unserer Mitarbeiter, der Ihnen dabei helfen kann.\u201c\n  Leite an {phone_number_1} weiter und beende den Anruf.\n\n  # Fehler- und Ausweichlogik\n  \u2013 Tool-Fehler: \u201eEs gab ein Problem bei der Verarbeitung. Ich versuche es erneut.\u201c\n  \u2013 Keine Verf\u00fcgbarkeit: \u201eF\u00fcr diese Zeit haben wir leider keine freien Pl\u00e4tze. M\u00f6chten Sie ein anderes Datum oder eine andere Uhrzeit versuchen?\u201c\n  \u2013 Reservierung aktuell nicht m\u00f6glich: \u201eIm Moment kann ich die Reservierung nicht best\u00e4tigen. M\u00f6chten Sie es sp\u00e4ter erneut versuchen oder uns direkt besuchen?\u201c\n  \u2013 Technische St\u00f6rung: \u201eWir haben derzeit ein technisches Problem. Bitte versuchen Sie es sp\u00e4ter erneut.\u201c\n  \u2013 Stille am Telefon: \u201eSind Sie noch da? Ich helfe Ihnen gern bei einer Bestellung oder Reservierung.\u201c\n\n  # Qualit\u00e4ts- & Validierungsregeln\n  \u2013 Eine Frage gleichzeitig\n  \u2013 Datum: nat\u00fcrliche Angaben \u2192 YYYY-MM-DD\n  \u2013 Zeit: nat\u00fcrliche Angaben \u2192 HH:MM:00 (24h)\n  \u2013 Telefonnummer: pr\u00fcfen und best\u00e4tigen (+49-Format, wenn m\u00f6glich)\n  \u2013 E-Mail: buchstabieren lassen (\u201epunkt\u201c, \u201eat\u201c, \u201eunterstrich\u201c, \u201ebindestrich\u201c)\n  \u2013 Tisch-IDs nie nennen \u2013 nur Anzahl der Tische\n  \u2013 Preise nennen, wenn Daten verf\u00fcgbar, sonst per E-Mail\n  \u2013 Keine Kundendaten weitergeben\n  \u2013 Minutenkontingent vor jedem Hauptfluss pr\u00fcfen; bei Ersch\u00f6pfung an {phone_number_1} weiterleiten\n\n  # Gespr\u00e4chsabschluss\n  Wenn Anliegen erledigt:\n  \u201eEinen sch\u00f6nen Tag noch und vielen Dank f\u00fcr Ihren Anruf bei {restaurant.name}.\u201c\n  Wenn R\u00fcckruf gew\u00fcnscht:\n  \u201eIch leite Ihr Anliegen weiter. Einen sch\u00f6nen Tag noch!\u201c\n  Gespr\u00e4ch beenden.\n"
+                        }
+                    ],
+                    "provider": "openai",
+                    "temperature": 0.2,
+                    "emotionRecognitionEnabled": true
+                },
+                "voice": {
+                    "model": "eleven_multilingual_v2",
+                    "speed": 1.1,
+                    "style": 0.5,
+                    "voiceId": "nF7t9cuYo0u3kuVI9q4B",
+                    "provider": "11labs",
+                    "stability": 0.2,
+                    "similarityBoost": 0.75
+                },
+                "server": {
+                    "url": "https://sacred-renewing-dove.ngrok-free.app/vapi-webhook/",
+                    "timeoutSeconds": 20
+                },
+                "transcriber": {
+                    "model": "nova-3",
+                    "language": "de",
+                    "numerals": true,
+                    "provider": "deepgram"
+                },
+                "artifactPlan": {
+                    "recordingFormat": "wav;l16",
+                    "recordingEnabled": true
+                },
+                "firstMessage": "Hi, hier ist Matilda von Tangerine Cafe. ",
+                "clientMessages": [
+                    "transcript",
+                    "hang",
+                    "metadata",
+                    "tool-calls",
+                    "tool-calls-result",
+                    "tool.completed",
+                    "transfer-update",
+                    "user-interrupted",
+                    "status-update",
+                    "assistant.started"
+                ],
+                "compliancePlan": {
+                    "pciEnabled": false,
+                    "hipaaEnabled": false
+                },
+                "variableValues": {},
+                "firstMessageMode": "assistant-speaks-first",
+                "startSpeakingPlan": {
+                    "waitSeconds": 0.5
+                },
+                "forwardingPhoneNumber": "+4915221531634",
+                "endCallFunctionEnabled": true,
+                "modelOutputInMessagesEnabled": true,
+                "backgroundSpeechDenoisingPlan": {
+                    "smartDenoisingPlan": {
+                        "enabled": true
+                    }
+                }
+            }
+        },
+        "assistant": {
+            "id": "eae99aec-7d07-4fad-8be1-c8c4f9c20761",
+            "orgId": "dbc59aa7-d41e-4d32-ab1f-a30e4a964135",
+            "name": "Tangerine Cafe",
+            "voice": {
+                "model": "eleven_multilingual_v2",
+                "speed": 1.1,
+                "style": 0.5,
+                "voiceId": "nF7t9cuYo0u3kuVI9q4B",
+                "provider": "11labs",
+                "stability": 0.2,
+                "similarityBoost": 0.75
+            },
+            "createdAt": "2025-10-30T08:01:55.521Z",
+            "updatedAt": "2025-11-01T10:25:30.336Z",
+            "model": {
+                "model": "gpt-4o-mini",
+                "toolIds": [
+                    "4752d0eb-599e-4dfa-bfa4-49028ed3719d",
+                    "b37ac635-60b8-4361-a116-b699bccb54c0",
+                    "7e0f819e-7b84-4501-a872-cc63f49bca41",
+                    "25169766-fecf-4f9a-b9c2-f3fe06a14045"
+                ],
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "prompt: |\n  # Restaurant Rezeptionist (Deutsch)\n\n  ## Identit\u00e4t & Zweck\n  Du bist ein freundlicher und professioneller KI-Mitarbeiter des Restaurants {restaurant.name}.\n  Deine Aufgaben:\n  \u2013 Bestellungen entgegennehmen\n  \u2013 Reservierungen anlegen oder best\u00e4tigen\n  \u2013 Allgemeine Fragen zum Restaurant beantworten\n  Du erkennst automatisch, wenn der Anrufer Englisch spricht oder Englisch w\u00fcnscht, und kannst das Gespr\u00e4ch dann flie\u00dfend auf Englisch fortsetzen. Das Wort \"Hi\" ist kein Hinweis darauf, dass jemand auf Englisch sprechen m\u00f6chte.\n  Die Standardsprache ist Deutsch.\n\n  ## Stimme & Persona\n  \u2013 Freundlich, organisiert, effizient\n  \u2013 Immer respektvoll in der \u201eSie\u201c-Form (nur auf Wunsch \u201edu\u201c)\n  \u2013 Ruhiges Sprechtempo, besonders bei Zahlen, Zeiten, Namen, E-Mails\n  \u2013 Bei Rabatten oder Aktionen erw\u00e4hne diese kurz und positiv\n  \u2013 Verwende klare, kurze S\u00e4tze und stelle nur eine Frage gleichzeitig\n\n  ## System & Zeit\n  \u2013 Zeitzone: Europe/Berlin\n  \u2013 Nutze das 24-Stunden-Format\n  \u2013 Merke dir das aktuelle Datum und die Uhrzeit\n\n  ## Ressourcen laden\n  Rufe direkt zu Beginn den Befehl Get_Restaurant_Info auf:\n  Parameter: {twilio_number}\n  Speichere f\u00fcr den gesamten Anruf:\n  {restaurant}, {items}, {tables}, {customers}, {areas}, {opening_time}, {closing_time}, {phone_number_1}, {total_vapi_minutes}, {total_used_minutes_vapi}\n\n  ## Minutenkontingent pr\u00fcfen\n  Wenn {total_vapi_minutes} > {total_used_minutes_vapi}, fahre fort.\n  Wenn nicht, leite den Anruf freundlich an {phone_number_1} weiter und beende das Gespr\u00e4ch.\n\n  # Begr\u00fc\u00dfung\n  \u201eSch\u00f6n, dass Sie anrufen! M\u00f6chten Sie etwas Bestellen oder einen Tisch reservieren?\"\n\n  # \u00d6ffnungszeiten pr\u00fcfen\n  Wenn die aktuelle Uhrzeit au\u00dferhalb {opening_time}\u2013{closing_time} liegt:\n  \u201eWir haben derzeit geschlossen und \u00f6ffnen wieder um {opening_time}. Sie k\u00f6nnen aber gerne vorbestellen, eine Reservierung vornehmen oder einen R\u00fcckruf w\u00fcnschen.\u201c\n  \u2013 Vorbestellung \u2192 Bestellfluss starten (\u201eZubereitung erfolgt ab \u00d6ffnung\u201c)\n  \u2013 Reservierung \u2192 Reservierungsfluss starten\n  \u2013 R\u00fcckruf \u2192 Kundendienstfluss starten\n  Wenn innerhalb der \u00d6ffnungszeiten \u2192 normal fortfahren.\n\n  # Intent-Kl\u00e4rung\n  Frage fr\u00fch: \u201eM\u00f6chten Sie etwas bestellen, einen Tisch reservieren oder haben Sie eine Frage zum Restaurant?\u201c\n  Je nach Antwort:\n  \u2013 Bestellung \u2192 Bestellfluss\n  \u2013 Reservierung \u2192 Reservierungsfluss\n  \u2013 Frage \u2192 Kundendienstfluss\n\n  # Bestellfluss\n  \u201eGern, ich starte Ihre Bestellung.\u201c\n  Wenn Rabatte in {items} verf\u00fcgbar: \u201eHeute gibt es ein besonderes Angebot: {discount details}.\u201c\n  Auf Wunsch Speisekarte vorlesen (nur Artikel mit Status \u201eavailable\u201c). Preise d\u00fcrfen genannt werden.\n\n  ## 1. Liefergebiet\n  \u201eBitte nennen Sie mir Ihre Postleitzahl und die Lieferadresse.\u201c\n  Wenn PLZ in {areas} vorhanden \u2192 {order_type} = \u201edelivery\u201c, {delivery_area} = Bereich aus {areas}\n  Wenn nicht vorhanden:\n  \u201eDorthin liefern wir leider nicht. M\u00f6chten Sie die Bestellung abholen oder lieber einen Tisch reservieren?\u201c\n  \u2013 Abholung \u2192 {order_type} = \u201epickup\u201c, {delivery_area} = null\n  \u2013 Reservierung \u2192 Reservierungsfluss\n\n  ## 2. Artikel\n  \u201eWelche Artikel m\u00f6chten Sie bestellen? Bitte jeweils mit Artikelname und Menge.\u201c \u2192 {order_items}\n  Pr\u00fcfe gegen {items} mit Status \u201eavailable\u201c. Wenn nicht verf\u00fcgbar: \u201eDieser Artikel ist leider ausverkauft. M\u00f6chten Sie etwas anderes?\u201c\n  \u201eGibt es Extras oder besondere Hinweise?\u201c \u2192 {extras}, {special_instructions}\n\n  ## 3. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 4. Name\n  \u201eAuf welchen Namen soll die Bestellung laufen?\u201c \u2192 {customer_name}\n\n  ## 5. E-Mail\n  \u201eBitte buchstabieren Sie Ihre E-Mail langsam und deutlich. Sagen Sie \u201apunkt\u2018 f\u00fcr \u201e.\u201c und \u201aat\u2018 f\u00fcr \u201e@\u201c. Zum Beispiel: \u201ameier punkt max at beispiel punkt de\u2018.\u201c \u2192 {email}\n  Wiederhole jedes Segment (z. B. \u201em-e-i-e-r\u201c) und best\u00e4tige.\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone}\n  Wiederhole sie und lass den Kunden best\u00e4tigen. Intern in +49-Format umwandeln, wenn m\u00f6glich.\n\n  ## 7. Zusatznotizen\n  \u201eGibt es noch Anmerkungen zur Bestellung?\u201c \u2192 {order_notes}\n\n  ## Zusammenfassung & Best\u00e4tigung\n  \u201eZur Best\u00e4tigung: Sie bestellen {list items} mit {extras/special_instructions}, als {order_type} f\u00fcr {address}. Der Gesamtbetrag betr\u00e4gt {total_price}. Ist das korrekt?\u201c\n  Wenn \u00c4nderungen \u2192 nur betroffene Punkte erneut abfragen.\n\n  ## Bestellung ausl\u00f6sen\n  Rufe OrderCreate auf mit:\n  {\n    restaurant: {restaurant},\n    customer_name: {customer_name},\n    email: {email},\n    phone: {phone},\n    status: \"incoming\",\n    order_notes: {order_notes},\n    address: {address},\n    allergy: {allergy},\n    order_type: {order_type},\n    delivery_area: {delivery_area},\n    order_items: [\n      {item: {item_id}, quantity: {quantity}, extras: {extras}, special_instructions: {special_instructions}}\n    ]\n  }\n  Wenn Antwort 201:\n  \u201eIhre Bestellung wurde erfolgreich aufgenommen. Die Best\u00e4tigung erhalten Sie in K\u00fcrze per E-Mail. Vielen Dank!\u201c\n  \u201eM\u00f6chten Sie noch etwas hinzuf\u00fcgen?\u201c Wenn nein: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Reservierungsfluss\n  \u201eGern, ich starte Ihre Reservierung.\u201c\n\n  ## 1. G\u00e4stezahl\n  \u201eF\u00fcr wie viele Personen m\u00f6chten Sie reservieren?\u201c\n  Pr\u00fcfe {tables} und kombiniere mehrere Tische intern (IDs nie nennen).\n\n  ## 2. Datum\n  \u201eF\u00fcr welches Datum m\u00f6chten Sie reservieren?\u201c \u2192 {date}\n  Akzeptiere nat\u00fcrliche Angaben (\u201emorgen\u201c, \u201en\u00e4chsten Freitag\u201c) und wandle in YYYY-MM-DD um.\n\n  ## 3. Uhrzeit\n  \u201eUm welche Uhrzeit d\u00fcrfen wir Sie erwarten?\u201c \u2192 {from_time}\n  \u201eBis wann planen Sie zu bleiben?\u201c \u2192 {to_time}\n  Konvertiere in HH:MM:00 (24h-Format).\n  \u2013 {from_time} \u2265 {opening_time}\n  \u2013 {to_time} \u2264 {closing_time}\n  Bei Abweichungen h\u00f6flich korrigieren.\n\n  ## 4. Allergien\n  \u201eGibt es Allergien, die wir beachten sollten?\u201c \u2192 {allergy} (leer, falls keine)\n\n  ## 5. Name\n  \u201eAuf welchen Namen sollen wir reservieren?\u201c \u2192 {customer_name}\n\n  ## 6. Telefonnummer\n  \u201eBitte nennen Sie mir Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Wiederholen und best\u00e4tigen.\n\n  ## 7. E-Mail\n  \u201eBitte nennen Sie mir die E-Mail-Adresse f\u00fcr die Best\u00e4tigung.\u201c \u2192 {email}\n  Buchstabenweise wiederholen und best\u00e4tigen.\n\n  ## No-Show-Hinweis\n  \u201eWir halten den Tisch 15 Minuten nach der vereinbarten Zeit frei. Bitte geben Sie uns rechtzeitig Bescheid, falls Sie sich versp\u00e4ten oder stornieren m\u00f6chten. Ohne R\u00fcckmeldung kann der Tisch anschlie\u00dfend neu vergeben werden.\u201c\n\n  ## Zusammenfassung\n  \u201eZur Best\u00e4tigung: Eine Reservierung f\u00fcr {guest_no} Personen am {date} von {from_time} bis {to_time} auf den Namen {customer_name}. Ist das korrekt?\u201c\n\n  ## Reservierung ausl\u00f6sen\n  Rufe Reservation auf (bei mehreren Tischen je Tisch einzeln):\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    guest_no: {guest_no},\n    allergy: {allergy},\n    date: {date},\n    from_time: {from_time},\n    to_time: {to_time},\n    table: {table_id},\n    email: {email},\n    status: \"reserved\"\n  }\n  Wenn Antwort 201:\n  \u201eIhre Reservierung wurde best\u00e4tigt. Die Best\u00e4tigung erhalten Sie per E-Mail. Wir freuen uns auf Ihren Besuch!\u201c\n  Zum Abschluss: \u201eEinen sch\u00f6nen Tag noch.\u201c (Gespr\u00e4ch beenden)\n\n  # Kundendienst- oder Informationsfluss\n  Wenn der Anrufer allgemeine Fragen hat, verwende Daten aus Get_Restaurant_Info:\n  \u2013 Name\n  \u2013 Adresse\n  \u2013 Telefonnummer\n  \u2013 \u00d6ffnungszeiten\n  \u2013 Website\n  Beantworte die Fragen klar und h\u00f6flich.\n\n  ## R\u00fcckruf oder Anfrage aufnehmen\n  \u201eDarf ich Ihren Namen notieren?\u201c \u2192 {customer_name}\n  \u201eBitte Ihre Telefonnummer.\u201c \u2192 {phone_number}\n  Rufe CustomerService auf:\n  {\n    customer_name: {customer_name},\n    phone_number: {phone_number},\n    restaurant: {restaurant},\n    type: \"inquiry\",\n    summary: {summary}\n  }\n  Wenn Antwort 201: \u201eVielen Dank, Ihre Anfrage wurde aufgenommen. Wir melden uns bei Ihnen.\u201c\n\n  ## \u00c4nderungs- oder Stornowunsch\n  Wenn Kunde Daten \u00e4ndern oder stornieren m\u00f6chte:\n  \u201eIch verbinde Sie mit einem unserer Mitarbeiter, der Ihnen dabei helfen kann.\u201c\n  Leite an {phone_number_1} weiter und beende den Anruf.\n\n  # Fehler- und Ausweichlogik\n  \u2013 Tool-Fehler: \u201eEs gab ein Problem bei der Verarbeitung. Ich versuche es erneut.\u201c\n  \u2013 Keine Verf\u00fcgbarkeit: \u201eF\u00fcr diese Zeit haben wir leider keine freien Pl\u00e4tze. M\u00f6chten Sie ein anderes Datum oder eine andere Uhrzeit versuchen?\u201c\n  \u2013 Reservierung aktuell nicht m\u00f6glich: \u201eIm Moment kann ich die Reservierung nicht best\u00e4tigen. M\u00f6chten Sie es sp\u00e4ter erneut versuchen oder uns direkt besuchen?\u201c\n  \u2013 Technische St\u00f6rung: \u201eWir haben derzeit ein technisches Problem. Bitte versuchen Sie es sp\u00e4ter erneut.\u201c\n  \u2013 Stille am Telefon: \u201eSind Sie noch da? Ich helfe Ihnen gern bei einer Bestellung oder Reservierung.\u201c\n\n  # Qualit\u00e4ts- & Validierungsregeln\n  \u2013 Eine Frage gleichzeitig\n  \u2013 Datum: nat\u00fcrliche Angaben \u2192 YYYY-MM-DD\n  \u2013 Zeit: nat\u00fcrliche Angaben \u2192 HH:MM:00 (24h)\n  \u2013 Telefonnummer: pr\u00fcfen und best\u00e4tigen (+49-Format, wenn m\u00f6glich)\n  \u2013 E-Mail: buchstabieren lassen (\u201epunkt\u201c, \u201eat\u201c, \u201eunterstrich\u201c, \u201ebindestrich\u201c)\n  \u2013 Tisch-IDs nie nennen \u2013 nur Anzahl der Tische\n  \u2013 Preise nennen, wenn Daten verf\u00fcgbar, sonst per E-Mail\n  \u2013 Keine Kundendaten weitergeben\n  \u2013 Minutenkontingent vor jedem Hauptfluss pr\u00fcfen; bei Ersch\u00f6pfung an {phone_number_1} weiterleiten\n\n  # Gespr\u00e4chsabschluss\n  Wenn Anliegen erledigt:\n  \u201eEinen sch\u00f6nen Tag noch und vielen Dank f\u00fcr Ihren Anruf bei {restaurant.name}.\u201c\n  Wenn R\u00fcckruf gew\u00fcnscht:\n  \u201eIch leite Ihr Anliegen weiter. Einen sch\u00f6nen Tag noch!\u201c\n  Gespr\u00e4ch beenden.\n"
+                    }
+                ],
+                "provider": "openai",
+                "temperature": 0.2,
+                "emotionRecognitionEnabled": true,
+                "tools": [
+                    {
+                        "id": "25169766-fecf-4f9a-b9c2-f3fe06a14045",
+                        "createdAt": "2025-09-12T09:59:33.088Z",
+                        "updatedAt": "2025-09-19T05:09:01.985Z",
+                        "type": "apiRequest",
+                        "function": {
+                            "name": "api_request_tool"
+                        },
+                        "messages": [
+                            {
+                                "type": "request-start",
+                                "blocking": false
+                            }
+                        ],
+                        "orgId": "dbc59aa7-d41e-4d32-ab1f-a30e4a964135",
+                        "name": "CustomerService",
+                        "url": "https://sacred-renewing-dove.ngrok-free.app/create-customer-service/",
+                        "method": "POST",
+                        "body": {
+                            "type": "object",
+                            "required": [
+                                "restaurant",
+                                "phone_number",
+                                "type"
+                            ],
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "email": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "restaurant": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "phone_number": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "customer_name": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "service_summary": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                }
+                            }
+                        },
+                        "variableExtractionPlan": {
+                            "schema": {
+                                "type": "object",
+                                "required": [],
+                                "properties": {}
+                            },
+                            "aliases": []
+                        }
+                    },
+                    {
+                        "id": "b37ac635-60b8-4361-a116-b699bccb54c0",
+                        "createdAt": "2025-08-03T04:15:21.541Z",
+                        "updatedAt": "2025-10-26T03:49:04.097Z",
+                        "type": "apiRequest",
+                        "function": {
+                            "name": "api_request_tool"
+                        },
+                        "messages": [
+                            {
+                                "type": "request-start",
+                                "blocking": false
+                            }
+                        ],
+                        "orgId": "dbc59aa7-d41e-4d32-ab1f-a30e4a964135",
+                        "name": "Get_Restaurant_Info",
+                        "url": "https://sacred-renewing-dove.ngrok-free.app/restaurants/full-data/",
+                        "method": "POST",
+                        "body": {
+                            "type": "object",
+                            "required": [
+                                "twilio_number"
+                            ],
+                            "properties": {
+                                "twilio_number": {
+                                    "type": "string",
+                                    "default": "+4915888648996\n",
+                                    "description": ""
+                                }
+                            }
+                        },
+                        "variableExtractionPlan": {
+                            "schema": {
+                                "type": "object",
+                                "required": [],
+                                "properties": {
+                                    "areas": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "id",
+                                                "postalcode",
+                                                "delivery_fee"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "description": ""
+                                                },
+                                                "postalcode": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "delivery_fee": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "estimated_delivery_time": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                }
+                                            }
+                                        },
+                                        "description": ""
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "id",
+                                                "name",
+                                                "price",
+                                                "status"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "description": ""
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "price": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "category": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "discount": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "preparation_time": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                }
+                                            }
+                                        },
+                                        "description": ""
+                                    },
+                                    "tables": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "description": ""
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "total_set": {
+                                                    "type": "integer",
+                                                    "description": "total number of guests can sit"
+                                                },
+                                                "reservations": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "to_time": {
+                                                                "type": "string",
+                                                                "description": ""
+                                                            },
+                                                            "from_time": {
+                                                                "type": "string",
+                                                                "description": ""
+                                                            }
+                                                        }
+                                                    },
+                                                    "description": ""
+                                                },
+                                                "reservation_status": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                }
+                                            }
+                                        },
+                                        "description": ""
+                                    },
+                                    "customers": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "phone"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                },
+                                                "phone": {
+                                                    "type": "string",
+                                                    "description": ""
+                                                }
+                                            }
+                                        },
+                                        "description": ""
+                                    },
+                                    "restaurant": {
+                                        "type": "object",
+                                        "required": [
+                                            "id",
+                                            "name",
+                                            "address",
+                                            "closing_time",
+                                            "opening_time",
+                                            "phone_number_1",
+                                            "total_vapi_minutes",
+                                            "total_used_minutes_vapi"
+                                        ],
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "description": ""
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "address": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "website": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "closing_time": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "opening_time": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "twilio_number": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "phone_number_1": {
+                                                "type": "string",
+                                                "description": ""
+                                            },
+                                            "total_vapi_minutes": {
+                                                "type": "number",
+                                                "description": ""
+                                            },
+                                            "total_used_minutes_vapi": {
+                                                "type": "number",
+                                                "description": ""
+                                            }
+                                        },
+                                        "description": ""
+                                    }
+                                }
+                            },
+                            "aliases": []
+                        }
+                    },
+                    {
+                        "id": "7e0f819e-7b84-4501-a872-cc63f49bca41",
+                        "createdAt": "2025-09-13T05:53:22.079Z",
+                        "updatedAt": "2025-10-30T05:46:36.160Z",
+                        "type": "apiRequest",
+                        "function": {
+                            "name": "api_request_tool"
+                        },
+                        "messages": [
+                            {
+                                "type": "request-start",
+                                "blocking": false
+                            }
+                        ],
+                        "orgId": "dbc59aa7-d41e-4d32-ab1f-a30e4a964135",
+                        "name": "OrderCreate",
+                        "url": "https://sacred-renewing-dove.ngrok-free.app/public/orders/create/",
+                        "method": "POST",
+                        "body": {
+                            "type": "object",
+                            "required": [
+                                "restaurant",
+                                "customer_name",
+                                "address",
+                                "order_items",
+                                "status",
+                                "email",
+                                "delivery_area",
+                                "order_type"
+                            ],
+                            "properties": {
+                                "email": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "phone": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "default": "incoming",
+                                    "description": ""
+                                },
+                                "address": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "allergy": {
+                                    "type": "string",
+                                    "default": "None",
+                                    "description": ""
+                                },
+                                "order_type": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "restaurant": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "order_items": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "required": [],
+                                        "properties": {}
+                                    },
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "order_notes": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "customer_name": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "delivery_area": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                }
+                            }
+                        },
+                        "variableExtractionPlan": {
+                            "schema": {
+                                "type": "object",
+                                "required": [],
+                                "properties": {}
+                            },
+                            "aliases": []
+                        }
+                    },
+                    {
+                        "id": "4752d0eb-599e-4dfa-bfa4-49028ed3719d",
+                        "createdAt": "2025-09-19T03:36:43.044Z",
+                        "updatedAt": "2025-10-30T06:42:58.580Z",
+                        "type": "apiRequest",
+                        "function": {
+                            "name": "api_request_tool"
+                        },
+                        "messages": [
+                            {
+                                "type": "request-start",
+                                "blocking": false
+                            }
+                        ],
+                        "orgId": "dbc59aa7-d41e-4d32-ab1f-a30e4a964135",
+                        "name": "Reservation",
+                        "url": "https://sacred-renewing-dove.ngrok-free.app/public/reservations/create/",
+                        "method": "POST",
+                        "body": {
+                            "type": "object",
+                            "required": [
+                                "phone_number",
+                                "date",
+                                "guest_no",
+                                "from_time",
+                                "to_time",
+                                "table",
+                                "status"
+                            ],
+                            "properties": {
+                                "date": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": "YYYY-MM-DD"
+                                },
+                                "email": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "table": {
+                                    "type": "number",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "default": "reserved",
+                                    "description": ""
+                                },
+                                "allergy": {
+                                    "type": "string",
+                                    "default": "None",
+                                    "description": ""
+                                },
+                                "to_time": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": "HH:MM:SS"
+                                },
+                                "guest_no": {
+                                    "type": "number",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "from_time": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": "HH:MM:SS"
+                                },
+                                "phone_number": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                },
+                                "customer_name": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": ""
+                                }
+                            }
+                        },
+                        "variableExtractionPlan": {
+                            "schema": {
+                                "type": "object",
+                                "required": [],
+                                "properties": {}
+                            },
+                            "aliases": []
+                        }
+                    }
+                ]
+            },
+            "forwardingPhoneNumber": "+4915221531634",
+            "firstMessage": "Hi, hier ist Matilda von Tangerine Cafe. ",
+            "endCallFunctionEnabled": true,
+            "transcriber": {
+                "model": "nova-3",
+                "language": "de",
+                "numerals": true,
+                "provider": "deepgram"
+            },
+            "clientMessages": [
+                "transcript",
+                "hang",
+                "metadata",
+                "tool-calls",
+                "tool-calls-result",
+                "tool.completed",
+                "transfer-update",
+                "user-interrupted",
+                "status-update",
+                "assistant.started"
+            ],
+            "firstMessageMode": "assistant-speaks-first",
+            "artifactPlan": {
+                "recordingFormat": "wav;l16",
+                "recordingEnabled": true
+            },
+            "modelOutputInMessagesEnabled": true,
+            "startSpeakingPlan": {
+                "waitSeconds": 0.5
+            },
+            "server": {
+                "url": "https://sacred-renewing-dove.ngrok-free.app/vapi-webhook/",
+                "backoffPlan": {
+                    "type": "fixed",
+                    "maxRetries": 10,
+                    "baseDelaySeconds": 2
+                },
+                "timeoutSeconds": 20
+            },
+            "credentials": [],
+            "compliancePlan": {
+                "pciEnabled": false,
+                "hipaaEnabled": false
+            },
+            "backgroundSpeechDenoisingPlan": {
+                "smartDenoisingPlan": {
+                    "enabled": true
+                }
+            },
+            "variableValues": {}
+        }
+    }
+}
