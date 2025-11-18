@@ -25,6 +25,7 @@ from AIvapi.models import Assistance,CallInformations
 from django.db.models import F, Sum, Func, IntegerField
 from subscription.models import Subscription
 from delivery_management.models import AreaManagement
+from datetime import time
 
 
 

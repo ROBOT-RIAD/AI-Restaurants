@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from drf_yasg.utils import swagger_auto_schema
 from accounts.models import User
 from .serializers import  UserRestaurantSerializer,RestaurantSerializerList,RestaurantSerializerStatus,UserApprovalUpdateSerializer,CallSummarySerializer,RestaurantOrderSummarySerializer,TopSellingItemSerializer,RestaurantCallStatsSerializer,AdminApprovalSerializer
-from restaurants.models import Restaurant
+from restaurants.models import Restaurant,OpenAndCloseTime
 from .serializers import RestaurantSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from accounts.permissions import IsAdminRole
@@ -35,6 +35,7 @@ from django.shortcuts import get_object_or_404
 import calendar
 from datetime import datetime
 from django.db.models.functions import TruncMonth
+from datetime import time
 
 
 class AdminRegisterApiView(CreateAPIView):
@@ -125,6 +126,19 @@ class AdminRegisterApiView(CreateAPIView):
                     restaurant=restaurant,
                     table_name=table_name,
                     total_set=4
+                )
+
+            default_open_time = time(hour=6, minute=0, second=0)
+            default_close_time = time(hour=17, minute=0, second=0)
+
+            days_of_week = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+            
+            for day in days_of_week:
+                OpenAndCloseTime.objects.create(
+                    restaurant=restaurant,
+                    day_of_week=day,
+                    opening_time=default_open_time,
+                    closing_time=default_close_time
                 )
 
             data = RestaurantSerializer(restaurant).data
