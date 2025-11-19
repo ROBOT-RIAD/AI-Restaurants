@@ -157,6 +157,7 @@ class RegisterApiView(CreateAPIView):
                     'role': user.role,
                 },
                 'restaurant':data,
+                'subscription':None,
             }
 
             return Response(response_data, status=status.HTTP_201_CREATED)

@@ -4,6 +4,7 @@ from restaurants.models import Restaurant
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import update_last_login
 from rest_framework.exceptions import APIException
+from subscription.models import Subscription
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -160,6 +161,28 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         else:
             # No restaurant found, optionally add this information
             data['restaurant'] = None  # Or skip this line if you don't want to include restaurant data at all
+
+        
+        subscription = Subscription.objects.filter(
+            user=user,
+            is_active=True
+        ).order_by('-created_at').first()
+
+        if subscription:
+            data['subscription'] = {
+                "package_name": subscription.package_name,
+                "price": subscription.price,
+                "price_id": subscription.price_id,
+                "billing_interval_count": subscription.billing_interval_count,
+                "status": subscription.status,
+                "cancel_at_period_end": subscription.cancel_at_period_end,
+                "start_date": subscription.start_date,
+                "current_period_end": subscription.current_period_end,
+                "end_date": subscription.end_date,
+                "is_active": subscription.is_active
+            }
+        else:
+            data['subscription'] = None
 
         data['user'] = {
             'id': user.id,
