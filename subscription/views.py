@@ -286,6 +286,17 @@ class CreateCheckoutSessionView(APIView):
             if not price_id:
                 return Response({'error': 'price_id is required'}, status=400)
             
+            
+            price = stripe.Price.retrieve(price_id)
+
+
+            if price["unit_amount"] == 0:  # free tier
+                has_any_subscription = Subscription.objects.filter(user=user).exists()
+                if has_any_subscription:
+                    return Response({
+                        'error': 'You have already used the free tier. Free subscription can only be activated once.'
+                    }, status=400)
+            
 
             active_subscription = Subscription.objects.filter(
             user=user,
@@ -385,6 +396,10 @@ class StripeWebhookView(APIView):
                     billing_interval_count = f"{interval_count} {interval}"
                     unit_amount = price.get('unit_amount') / 100 if price and price.get('unit_amount') else None
 
+                    if unit_amount == 0 and Subscription.objects.filter(user=user).exists():
+                        print("❌ Free plan blocked — restaurant already has subscription history.")
+                        return HttpResponse(status=200)
+
                     Subscription.objects.create(
                         user=user,
                         stripe_customer_id=stripe_sub['customer'],
@@ -421,6 +436,15 @@ class StripeWebhookView(APIView):
                     sub_id = data['id']
                     sub = Subscription.objects.filter(stripe_subscription_id=sub_id).first()
                     if sub:
+                        stripe_sub = stripe.Subscription.retrieve(sub_id, expand=['items'])
+                        item = stripe_sub['items']['data'][0] if stripe_sub['items']['data'] else None
+                        price = item.get('price') if item else None
+                        unit_amount = price.get('unit_amount') / 100 if price and price.get('unit_amount') else 0
+                        if unit_amount == 0:
+                            print("❌ Ignoring free-tier subscription update.")
+                            return HttpResponse(status=200)
+                        
+
                         current_period_end = data.get('current_period_end')
                         if current_period_end:
                             sub.current_period_end = datetime.fromtimestamp(current_period_end, tz=dt_timezone.utc)
