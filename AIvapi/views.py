@@ -113,7 +113,7 @@ class AssistantCreateView(APIView):
                 ssid=twilio_account_sid,
                 restaurant_fallback=restaurant.phone_number_1,
                 auth_token=twilio_auth_token,
-                webhook='https://sacred-renewing-dove.ngrok-free.app/vapi-webhook/',
+                webhook='https://api.trusttaste.ai/vapi-webhook/',
             )
         except Exception as e:
             return Response(

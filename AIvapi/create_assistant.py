@@ -3,7 +3,7 @@ from django.conf import settings
 
 VAPI_API_KEY=settings.VAPI_API
 
-def create_assistant(voice="matilda", restaurant_name="MadChef", speed=1.0, webhook_url="https://6ff6e7b024f9.ngrok-free.app/vapi-webhook", restaurant_no="+8801615791025"): 
+def create_assistant(voice="matilda", restaurant_name="MadChef", speed=1.0, webhook_url="https://api.trusttaste.ai/vapi-webhook", restaurant_no="+8801615791025"): 
     if speed<0.7:
         speed = 0.7
     elif speed>1.2:
