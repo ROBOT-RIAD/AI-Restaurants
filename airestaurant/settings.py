@@ -34,6 +34,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 CSRF_TRUSTED_ORIGINS = [
     'https://api.trusttaste.ai',
     'https://www.api.trusttaste.ai',
+    'https://admin.trusttaste.ai/',
 ]
 # Application definition
 
