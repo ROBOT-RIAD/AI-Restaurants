@@ -142,7 +142,7 @@ class TableListView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        restaurant_timezone = pytz_timezone('Asia/Dhaka')
+        restaurant_timezone = pytz_timezone('Europe/Berlin')
         tables = Table.objects.filter(restaurant=restaurant)
         current_time = timezone.now().astimezone(restaurant_timezone)
 
@@ -553,7 +553,7 @@ class TableReservationStatusUpdateView(APIView):
                 {"error": "You don't have a restaurant assigned."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        restaurant_timezone = pytz_timezone('Asia/Dhaka')
+        restaurant_timezone = pytz_timezone('Europe/Berlin')
         tables = Table.objects.filter(restaurant=restaurant)
         current_time = timezone.now().astimezone(restaurant_timezone)
 
