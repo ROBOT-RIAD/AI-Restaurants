@@ -28,6 +28,7 @@ def extract_from_pdf(path="files/demo4.pdf"):
                     "text": (
                     "Extract all menu items from this restaurant menu PDF and output each item in the following JSON format:\n"
                     '{\n  "item_name": <name>,\n  "status": <available/unavailable>,\n  "descriptions": <description>,\n  "image": null,\n  "category": <category>,\n  "price": <price>,\n  "discount": <discount_percent>,\n  "preparation_time": <hh:mm:ss>\n}\n'
+                    "Follow the data type exactly for each field. -> item_name, status, descriptions, category as strings; image as null; price and discount as numbers or decimals; preparation_time as string in hh:mm:ss format.\n"
                     "Return a list of such JSON objects for all items found.\n"
                     "If values are in other languages, keep them as is following the json format."
                     "If any fields are missing, please keep them null. "
