@@ -35,6 +35,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://api.trusttaste.ai',
     'https://www.api.trusttaste.ai',
     'https://admin.trusttaste.ai/',
+    'http://localhost:5173/',
 ]
 # Application definition
 
