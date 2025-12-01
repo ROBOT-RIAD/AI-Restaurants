@@ -6,9 +6,10 @@ from django.template.loader import render_to_string
 
 def send_order_confirmation_email(order):
     """Send order confirmation email after order creation"""
-    if not order.email:
+    if not order.customer or not order.customer.email:
         return
-
+    
+    customer = order.customer
     restaurant = order.restaurant
     subject = f"Order Confirmation - {restaurant.resturent_name}"
 
@@ -70,22 +71,22 @@ def send_order_confirmation_email(order):
         <hr>
         <p>We look forward to serving you!</p>
         """,
-        order.customer_name,
+        customer.customer_name,
         restaurant.resturent_name,
         item_rows,
         Decimal(delivery_fee or 0),
         order.total_price,
         order.id,
-        order.customer_name,
-        order.phone or "N/A",
-        order.address or "N/A"
+        customer.customer_name,
+        customer.phone or "N/A",
+        customer.address or "N/A"
     )
 
     send_mail(
         subject,
         message,
-        settings.EMAIL_HOST_USER,
-        [order.email],
+        settings.DEFAULT_FROM_EMAIL,
+        [customer.email],
         html_message=message
     )
 
@@ -95,18 +96,19 @@ def send_order_verified_email(order):
     """
     Sends a 'Your order verification link' email to the customer.
     """
-    if not order.email:
-        # print("⚠️ No email found — skipping verification email.")
+    if not order.customer or not order.customer.email:
         return
 
+    customer = order.customer
     restaurant = order.restaurant
+    print(customer.customer_name)
 
-    verify_link = f"http://10.10.13.26:9002/public/order/verify/{order.id}/"
+    verify_link = f"https://api.trusttaste.ai/public/order/verify/{order.id}/"
 
     subject = f"✅ Order #{order.id} Verification Required"
 
     message = f"""
-    Hello {order.customer_name},
+    Hello {customer.customer_name},
 
     Your order (ID: {order.id}) has been successfully created.
 
@@ -117,8 +119,7 @@ def send_order_verified_email(order):
 
     🧾 Order Summary:
     - Total Price: ${order.total_price}
-    - Address: {order.address or 'N/A'}
-
+    - Address: {customer.address or 'N/A'}
     We appreciate your trust and hope to serve you again soon!
 
     Regards,  
@@ -173,7 +174,7 @@ def send_order_verified_email(order):
     <body>
         <div class="container">
             <h2>🔔 Order Verification Required</h2>
-            <p>Hello <b>{order.customer_name}</b>,</p>
+            <p>Hello <b>{customer.customer_name}</b>,</p>
             <p>Your order (<b>ID: {order.id}</b>) has been successfully created.</p>
             <p>Please verify your order by clicking the button below:</p>
             <p style="text-align: center;">
@@ -182,7 +183,7 @@ def send_order_verified_email(order):
 
             <h3>🧾 Order Summary</h3>
             <p><b>Total Price:</b> ${order.total_price}</p>
-            <p><b>Address:</b> {order.address or "N/A"}</p>
+            <p><b>Address:</b> {customer.address or "N/A"}</p>
 
             <div class="footer">
                 <p><b>@{restaurant.resturent_name}</b></p>
@@ -199,11 +200,11 @@ def send_order_verified_email(order):
             subject,
             message.strip(),
             settings.DEFAULT_FROM_EMAIL,
-            [order.email],
+            [customer.email],
             html_message=html_message,
             fail_silently=False,
         )
-        print(f"✅ Verification email sent to {order.email}")
+        print(f"✅ Verification email sent to {customer.email}")
     except Exception as e:
         print(f"❌ Failed to send verification email: {e}")
     

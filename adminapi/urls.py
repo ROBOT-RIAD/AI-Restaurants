@@ -4,7 +4,7 @@ from .views import AdminRegisterApiView,AdminRestaurantListAPIView,AdminRestaura
 from subscription.views import PackageViewSet
 from AIvapi.views import AssistantCreateView,UpdateTwilioCredsAPIView
 from support.views import SupportListAPIView,SupportDetailAPIView,SupportStatusUpdateAPIView
-
+from accounts.views import AdminRestaurantDeleteAPIView
 router = DefaultRouter()
 router.register('packages', PackageViewSet)
 
@@ -27,5 +27,6 @@ urlpatterns = [
     path('monthly-revenue/', MonthlyRevenueAPIView.as_view(), name='monthly-revenue'),
     path('assistance/update-twilio-creds/', UpdateTwilioCredsAPIView.as_view(), name='update-twilio-creds'),
     path('restaurant-stats/', RestaurantAnalysis.as_view(), name='restaurant-stats'),
+    path('restaurant/delete/', AdminRestaurantDeleteAPIView.as_view(), name='admin-restaurant-delete'),
     path('api/', include(router.urls)),
 ]

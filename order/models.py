@@ -3,20 +3,18 @@ from items.models import Item
 from restaurants.models import Restaurant
 from .constants import STATUS_CHOICES,ORDER_TYPE_CHOICES
 from delivery_management.models import AreaManagement
+from customer.models import Customer
 
 
 
 # Create your models here.
 class Order(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='orders')
-    customer_name = models.CharField(max_length=255)
-    email = models.EmailField(null=True, blank=True)
     status = models.CharField(max_length=50,choices=STATUS_CHOICES)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
-    phone = models.CharField(max_length=15,null=True, blank=True)
     order_notes = models.TextField(null=True, blank=True)
     discount_text = models.TextField(null=True, blank=True)
-    address = models.TextField(null=True, blank=True)
     allergy = models.TextField(null=True, blank=True)
     delivery_area = models.ForeignKey(AreaManagement, on_delete=models.SET_NULL,null=True,blank=True,related_name='order')
     delivery_area_json = models.JSONField(null=True, blank=True)
@@ -27,7 +25,7 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.customer_name}"
+        return self.customer.customer_name if self.customer else f"Order {self.id}"
     
 
 

@@ -4,6 +4,7 @@ from items.models import Item
 from django.db.models import Sum, Count, Min, Max
 from .emails import send_order_confirmation_email,send_order_verified_email
 from table.signals import send_twilio_sms_via_assistance
+from customer.models import Customer
 
 
 
@@ -53,6 +54,12 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
 
 
 class OrderCreateSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(required=False)
+    address = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
+    phone = serializers.CharField(required=False)
+
+
     order_items = OrderItemCreateSerializer(many=True, write_only=True)
     delivery_area_json = serializers.JSONField(read_only=True)
 
@@ -69,6 +76,24 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         order_items_data = validated_data.pop("order_items", [])
+
+
+        phone_number = validated_data.pop('phone', None)
+        customer_name = validated_data.pop('customer_name', None)
+        email = validated_data.pop('email', None)
+        address = validated_data.pop('address', None)
+
+        if phone_number:
+            customer, created = Customer.objects.get_or_create(phone=phone_number)
+            customer.customer_name = customer_name or customer.customer_name
+            customer.email = email or customer.email
+            customer.address = address or customer.address
+            customer.save()
+            validated_data["customer"] = customer
+        else:
+            validated_data["customer"] = None
+
+
         delivery_area = validated_data.get("delivery_area")
 
         if delivery_area:
@@ -140,12 +165,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         order.total_price = total_price
         order.save()
 
-        phone = order.phone
+        phone = order.customer.phone if order.customer else None
         has_previous_verified = False
 
         if phone:
             has_previous_verified = Order.objects.filter(
-                phone=phone,
+                customer__phone=phone,
                 verified=True,
                 status ="completed",
             ).exists()
@@ -163,13 +188,19 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
 class OrderVerificationSerializer(serializers.ModelSerializer):
     class Meta:
-        modele = Order
+        model = Order
         fields = ['verified']
 
 
 
 
 class OrderUpdateSerializer(serializers.ModelSerializer):
+    # Map customer-related fields from the related Customer model for update operations
+    customer_name = serializers.CharField(source='customer.customer_name', required=False, allow_null=True)
+    email = serializers.EmailField(source='customer.email', required=False, allow_null=True)
+    phone = serializers.CharField(source='customer.phone', required=False, allow_null=True)
+    address = serializers.CharField(source='customer.address', required=False, allow_null=True)
+
     order_items = OrderItemCreateSerializer(many=True, write_only=True, required=False)
 
     class Meta:
@@ -290,6 +321,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
+    # Map customer-related fields from the related Customer model
+    customer_name = serializers.CharField(source='customer.customer_name', read_only=True)
+    email = serializers.EmailField(source='customer.email', read_only=True)
+    phone = serializers.CharField(source='customer.phone', read_only=True)
+    address = serializers.CharField(source='customer.address', read_only=True)
+
     order_items = OrderItemSerializer(many=True) 
 
     class Meta:
@@ -330,9 +367,9 @@ class CustomerOrderGroupSerializer(serializers.Serializer):
         }
 
         return {
-            "name": first_order.customer_name,
-            "email": first_order.email,
-            "phone": first_order.phone,
+            "name": first_order.customer.customer_name if first_order.customer else None,
+            "email": first_order.customer.email if first_order.customer else None,
+            "phone": first_order.customer.phone if first_order.customer else None,
             "first_order_create_date": stats["first_order_create_date"],
             "last_order_date": stats["last_order_date"],
             "total_order": stats["total_order"],

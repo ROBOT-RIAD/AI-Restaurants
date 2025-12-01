@@ -11,7 +11,7 @@ def send_reservation_reminder_email(email, subject, message):
     send_mail(
         subject,
         message,
-        settings.EMAIL_HOST_USER,
+        settings.DEFAULT_FROM_EMAIL,
         [email],
         html_message=message
     )

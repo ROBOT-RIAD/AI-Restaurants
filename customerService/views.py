@@ -58,51 +58,19 @@ class CreateCustomerService(APIView):
 
 
 
-
 class CustomerSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_description="Get customer summary for reservations, orders, and services. "
-                              "Search by phone using ?phone=NUMBER. Filter records created after a specific date with ?created_at=YYYY-MM-DD.",
+                              "Search by phone using ?phone=NUMBER. Filter by created after date using ?created_at=YYYY-MM-DD.",
         manual_parameters=[
-            openapi.Parameter(
-                "phone",
-                openapi.IN_QUERY,
-                description="Search by phone number (partial or full match)",
-                type=openapi.TYPE_STRING,
-                required=False,
-            ),
-            openapi.Parameter(
-                "created_at",
-                openapi.IN_QUERY,
-                description="Filter records created after a specific date (format: YYYY-MM-DD)",
-                type=openapi.TYPE_STRING,
-                required=False,
-            ),
+            openapi.Parameter("phone", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter("created_at", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=False),
         ],
-        responses={
-            200: openapi.Response(
-                description="Customer summary list",
-                examples={
-                    "application/json": [
-                        {
-                            "name": "John Doe",
-                            "phone": "1234567890",
-                            "most_recent_last": {
-                                "type": "order",
-                                "created_at": "2025-09-08T14:30:00Z"
-                            },
-                            "total_create": 5
-                        }
-                    ]
-                },
-            ),
-            404: "Restaurant not found for this user",
-        },
         tags=['customer Api'],
     )
-    def get(self, request, *args, **kwargs):
+    def get(self, request):
         user = request.user
 
         try:
@@ -116,86 +84,109 @@ class CustomerSummaryAPIView(APIView):
         phone_filter = request.query_params.get("phone")
         created_at_filter = request.query_params.get("created_at")
 
+        # Date filter handling
         created_at_date = None
         if created_at_filter:
             created_at_date = parse_date(created_at_filter)
             if not created_at_date:
                 return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
             start_of_day = datetime.combine(created_at_date, datetime.min.time(), tzinfo=pytz.UTC)
             end_of_day = start_of_day + timedelta(days=1)
 
-        customer_data = {}
+        # STEP 1: Collect all phones from related models
+        phones = set()
 
-        phones = set(
-            list(
-                Reservation.objects.filter(table__restaurant=restaurant)
-                .exclude(phone_number__isnull=True)
-                .values_list("phone_number", flat=True)
-            )
-            + list(
-                Order.objects.filter(restaurant=restaurant)
-                .exclude(phone__isnull=True)
-                .values_list("phone", flat=True)
-            )
-            + list(
-                CustomerService.objects.filter(restaurant=restaurant)
-                .exclude(phone_number__isnull=True)
-                .values_list("phone_number", flat=True)
-            )
-        )
+        # Reservations → Customer.phone
+        res_customers = Reservation.objects.filter(
+            table__restaurant=restaurant,
+            customer__isnull=False
+        ).values_list("customer__phone", flat=True)
 
+        phones.update([p for p in res_customers if p])
+
+        # Orders → Customer.phone
+        order_customers = Order.objects.filter(
+            restaurant=restaurant,
+            customer__isnull=False
+        ).values_list("customer__phone", flat=True)
+
+        phones.update([p for p in order_customers if p])
+
+        # CustomerService → Customer.phone
+        service_customers = CustomerService.objects.filter(
+            restaurant=restaurant,
+            customer__isnull=False
+        ).values_list("customer__phone", flat=True)
+
+        phones.update([p for p in service_customers if p])
+
+        # Apply ?phone= filter
         if phone_filter:
             phones = {phone for phone in phones if phone_filter in phone}
 
+        # STEP 2: Build summary for each phone
+        customer_data = {}
+
         for phone in phones:
             # Latest Reservation
-            last_res = (
-                Reservation.objects.filter(table__restaurant=restaurant, phone_number=phone)
-                .order_by("-created_at")
+            last_res = Reservation.objects.filter(
+                table__restaurant=restaurant,
+                customer__phone=phone
             )
             if created_at_date:
-                last_res = last_res.filter(created_at__gte=start_of_day, created_at__lt=end_of_day)
-            last_res = last_res.first()
+                last_res = last_res.filter(created_at__range=(start_of_day, end_of_day))
+            last_res = last_res.order_by("-created_at").first()
+            res_count = Reservation.objects.filter(
+                table__restaurant=restaurant,
+                customer__phone=phone
+            ).count()
 
-            res_count = Reservation.objects.filter(table__restaurant=restaurant, phone_number=phone).count() if last_res else 0
-
-            last_order = (
-                Order.objects.filter(restaurant=restaurant, phone=phone)
-                .order_by("-created_at")
+            # Latest Order
+            last_order = Order.objects.filter(
+                restaurant=restaurant,
+                customer__phone=phone
             )
             if created_at_date:
-                last_order = last_order.filter(created_at__gte=start_of_day, created_at__lt=end_of_day)
-            last_order = last_order.first()
-            order_count = Order.objects.filter(restaurant=restaurant, phone=phone).count() if last_order else 0
+                last_order = last_order.filter(created_at__range=(start_of_day, end_of_day))
+            last_order = last_order.order_by("-created_at").first()
+            order_count = Order.objects.filter(
+                restaurant=restaurant,
+                customer__phone=phone
+            ).count()
 
-            last_service = (
-                CustomerService.objects.filter(restaurant=restaurant, phone_number=phone)
-                .order_by("-created_at")
+            # Latest CustomerService
+            last_service = CustomerService.objects.filter(
+                restaurant=restaurant,
+                customer__phone=phone
             )
             if created_at_date:
-                last_service = last_service.filter(created_at__gte=start_of_day, created_at__lt=end_of_day)
-            last_service = last_service.first()
-            service_count = CustomerService.objects.filter(restaurant=restaurant, phone_number=phone).count() if last_service else 0
+                last_service = last_service.filter(created_at__range=(start_of_day, end_of_day))
+            last_service = last_service.order_by("-created_at").first()
+            service_count = CustomerService.objects.filter(
+                restaurant=restaurant,
+                customer__phone=phone
+            ).count()
 
+            # Find latest record
             latest_record = max(
                 [last_res, last_order, last_service],
-                key=lambda x: x.created_at.astimezone(pytz.utc) if x else datetime(1, 1, 1, tzinfo=pytz.utc),
+                key=lambda obj: obj.created_at.astimezone(pytz.UTC) if obj else datetime(1, 1, 1, tzinfo=pytz.UTC)
             )
 
-            if latest_record:
-                if isinstance(latest_record, Reservation):
-                    last_type = "reservation"
-                    name = latest_record.customer_name
-                elif isinstance(latest_record, Order):
-                    last_type = "order"
-                    name = latest_record.customer_name
-                elif isinstance(latest_record, CustomerService):
-                    last_type = "service"
-                    name = latest_record.customer_name
-                else:
-                    last_type, name = None, None
+            # Determine type + name
+            if isinstance(latest_record, Reservation):
+                last_type = "reservation"
+                name = latest_record.customer.customer_name
+            elif isinstance(latest_record, Order):
+                last_type = "order"
+                name = latest_record.customer.customer_name
+            elif isinstance(latest_record, CustomerService):
+                last_type = "service"
+                name = latest_record.customer.customer_name
             else:
-                last_type, name = None, None
+                last_type = None
+                name = None
 
             customer_data[phone] = {
                 "name": name,
@@ -204,14 +195,16 @@ class CustomerSummaryAPIView(APIView):
                     "type": last_type,
                     "created_at": latest_record.created_at if latest_record else None,
                 },
-                "total_create": res_count + order_count + service_count,
+                "total_create": res_count + order_count + service_count
             }
 
-        data = list(customer_data.values())
-        data = sorted([record for record in customer_data.values() if record['most_recent_last']['created_at'] is not None], key=lambda x: x['most_recent_last']['created_at'] if x['most_recent_last']['created_at'] else datetime(1, 1, 1, tzinfo=pytz.utc), reverse=True)
+        data = sorted(
+            [record for record in customer_data.values() if record['most_recent_last']['created_at']],
+            key=lambda x: x["most_recent_last"]["created_at"],
+            reverse=True
+        )
 
         return Response(data)
-
 
 
 
@@ -264,9 +257,3 @@ class PendingCallbacksView(APIView):
         serializer = CustomerServiceSerializer(callback)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-
-
-
-
-
-

@@ -14,6 +14,7 @@ from rest_framework.exceptions import ValidationError
 from datetime import datetime, timedelta
 from django.db.models import Q
 from django.utils.timezone import now
+from customer.models import Customer
 # Create your views here.
 from django.utils import timezone
 from pytz import timezone as pytz_timezone
@@ -375,8 +376,16 @@ class ReservationCreateAPIView(APIView):
     )  
     def post(self, request, *args, **kwargs):
         user = request.user
-        table_id = request.data.get('table')
-        phone_number = request.data.get('phone_number') 
+        data = request.data
+        
+        customer_name = data.get('customer_name')
+        phone_number = data.get('phone_number')
+        email = data.get('email')
+        address = data.get('address')
+        table_id = data.get('table')
+
+        if not phone_number:
+            raise ValidationError("Phone number is required for customer.")
 
         try:
             restaurant = Restaurant.objects.get(owner=user)
@@ -415,23 +424,44 @@ class ReservationCreateAPIView(APIView):
             # Check for conflicts (1 hour before and 10 minutes after)
             if (from_time < reservation_to_time + timedelta(minutes=10)) and (to_time > reservation_from_time - timedelta(minutes=60)):
                 raise ValidationError(f"This table is already reserved during the selected time slot. Please choose a different time.")
+            
+        
 
-        serializer = ReservationSerializer(data=request.data)
+        customer, created = Customer.objects.get_or_create(phone=phone_number)
+        
+        customer.customer_name = customer_name or customer.customer_name
+        customer.email = email or customer.email
+        customer.address = address or customer.address
+        customer.save()
+        
+        serializer_data = {
+            "customer": customer.id,
+            "guest_no": data.get("guest_no"),
+            "date": date,
+            "from_time": request.data.get('from_time'),
+            "to_time": request.data.get('to_time'),
+            "table": table.id,
+            "allergy": data.get("allergy", ""),
+            "status": data.get("status", "reserved"),
+        }
+
+        serializer = ReservationSerializer(data=serializer_data)
+
         if serializer.is_valid():
             verified_status = True
             if phone_number:
                 has_unfinished = Reservation.objects.filter(
-                    phone_number=phone_number
+                    customer__phone=phone_number
                 ).exclude(status='finished').exists()
                 if has_unfinished:
                     verified_status = False
-            reservation = serializer.save(verified=verified_status)
+            reservation = serializer.save(verified=verified_status,customer=customer)
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f"restaurant_{restaurant.id}",
                 {
                     "type": "reservation_created",
-                    "reservation": serializer.data
+                    "reservation": ReservationSerializer(reservation).data
                 }
             )    
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -498,14 +528,13 @@ class RestaurantReservationsAPIView(APIView):
         reservations = Reservation.objects.filter(table__restaurant=restaurant)
 
         if customer_name:
-            reservations = reservations.filter(Q(customer_name__icontains=customer_name))
+            reservations = reservations.filter(customer__customer_name__icontains=customer_name)
         if phone_number:
-            reservations = reservations.filter(Q(phone_number__icontains=phone_number))
+            reservations = reservations.filter(customer__phone__icontains=phone_number)
         if table_name:
-            reservations = reservations.filter(Q(table__table_name__icontains=table_name))
+            reservations = reservations.filter(table__table_name__icontains=table_name)
         if email:
-            reservations = reservations.filter(Q(email__icontains=email))
-        
+            reservations = reservations.filter(customer__email__icontains=email)
         if reservation_date:
             reservations = reservations.filter(date=reservation_date)
 
@@ -872,7 +901,7 @@ class TableReservationsView(APIView):
             reservations = Reservation.objects.filter(table=table, date=date)
             reservations_data = [
                 {
-                    "customer_name": reservation.customer_name,
+                    "customer_name": reservation.customer.customer_name if reservation.customer else "Unknown",
                     "guest_no": reservation.guest_no,
                     "from_time": reservation.from_time.strftime('%H:%M:%S'),
                     "to_time": reservation.to_time.strftime('%H:%M:%S'),
@@ -909,9 +938,14 @@ class PublicReservationCreateAPIView(APIView):
         tags=['Webhook'],
     )  
     def post(self, request, *args, **kwargs):
+        data = request.data
 
-        print(request.data)
-        table_id = request.data.get('table') 
+
+        table_id = data.get('table')
+        customer_name = data.get('customer_name')
+        phone_number = data.get('phone_number')
+        email = data.get('email')
+        address = data.get('address')
 
         if not table_id:
             raise ValidationError("Table is required.")
@@ -944,19 +978,46 @@ class PublicReservationCreateAPIView(APIView):
             # Check for conflicts (1 hour before and 10 minutes after)
             if (from_time < reservation_to_time + timedelta(minutes=10)) and (to_time > reservation_from_time - timedelta(minutes=60)):
                 raise ValidationError(f"This table is already reserved during the selected time slot. Please choose a different time.")
+            
+        
 
-        serializer = ReservationSerializer(data=request.data)
+        customer, created = Customer.objects.get_or_create(phone=phone_number)
+        
+        customer.customer_name = customer_name or customer.customer_name
+        customer.email = email or customer.email
+        customer.address = address or customer.address
+        customer.save()
+
+        serializer_data = {
+            "customer": customer.id, 
+            "guest_no": data.get("guest_no"),
+            "date": date,
+            "from_time": request.data.get('from_time'),
+            "to_time": request.data.get('to_time'),
+            "table": table.id,
+            "allergy": data.get("allergy", ""),
+            "status": data.get("status", "reserved"),
+        }
+
+        serializer = ReservationSerializer(data=serializer_data)
         if serializer.is_valid():
-            reservation = serializer.save()
+            verified_status = True
+            if phone_number:
+                has_unfinished = Reservation.objects.filter(
+                    customer__phone=phone_number
+                ).exclude(status='finished').exists()
+                if has_unfinished:
+                    verified_status = False
+            reservation = serializer.save(verified=verified_status,customer=customer)
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f"restaurant_{restaurant.id}",
                 {
                     "type": "reservation_created",
-                    "reservation": serializer.data
+                    "reservation": ReservationSerializer(reservation).data
                 }
             ) 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(ReservationSerializer(reservation).data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -995,12 +1056,18 @@ class ReservationAutoVerifyView(APIView):
         reservation = get_object_or_404(Reservation, pk=pk)
         table = reservation.table
         restaurant = table.restaurant
+        customer = reservation.customer
 
 
         if not reservation.verified:
             reservation.verified = True
             reservation.save(update_fields=["verified", "updated_at"])
             send_reservation_confirmation_email_manual(reservation)
+
+        customer_name = customer.customer_name if customer else "Valued Customer"
+        phone_number = customer.phone if customer else "N/A"
+        email = customer.email if customer else "N/A"
+        address = customer.address if customer else "N/A"
 
         html = f"""
         <html>
@@ -1048,7 +1115,7 @@ class ReservationAutoVerifyView(APIView):
         </head>
         <body>
             <div class="container">
-                <h2>✅ Thank you, {reservation.customer_name}!</h2>
+                <h2>✅ Thank you, {customer_name}!</h2>
                 <p>Your reservation has been successfully verified.</p>
 
                 <h3>Reservation Details</h3>
@@ -1061,9 +1128,9 @@ class ReservationAutoVerifyView(APIView):
                     <tr><th>To Time</th><td>{reservation.to_time}</td></tr>
                     <tr><th>Table</th><td>{table.table_name}</td></tr>
                     <tr><th>Restaurant</th><td>{restaurant.resturent_name}</td></tr>
-                    <tr><th>Phone</th><td>{reservation.phone_number or "N/A"}</td></tr>
-                    <tr><th>Email</th><td>{reservation.email or "N/A"}</td></tr>
-                    <tr><th>Address</th><td>{reservation.address or "N/A"}</td></tr>
+                    <tr><th>Phone</th><td>{phone_number}</td></tr>
+                    <tr><th>Email</th><td>{email}</td></tr>
+                    <tr><th>Address</th><td>{address}</td></tr>
                     <tr><th>Allergy Info</th><td>{reservation.allergy or "None"}</td></tr>
                 </table>
 

@@ -26,6 +26,8 @@ from django.db.models import F, Sum, Func, IntegerField
 from subscription.models import Subscription
 from delivery_management.models import AreaManagement
 from datetime import time
+from customer.models import Customer
+from extras.models import Extra
 
 
 
@@ -249,7 +251,7 @@ class SendOTPView(APIView):
             send_mail(
             subject='Your OTP Code',
             message=f'Your OTP is: {otp_record.otp}',
-            from_email=settings.EMAIL_HOST_USER,
+            from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
             )
 
@@ -388,6 +390,7 @@ class RestaurantFullDataAPIView(APIView):
         # Get related data
         items = Item.objects.filter(restaurant=restaurant)
         tables = Table.objects.filter(restaurant=restaurant)
+        extras = Extra.objects.filter(restaurant=restaurant) 
         today = now().date()
         reservations = Reservation.objects.filter(table__restaurant=restaurant, date__gte=today)
 
@@ -404,71 +407,54 @@ class RestaurantFullDataAPIView(APIView):
                 "table": reservation.table.table_name,
                 "email": reservation.email,
             })
+
+
         # Collect distinct phone numbers
         phones = set(
             list(
                 Reservation.objects.filter(table__restaurant=restaurant)
-                .exclude(phone_number__isnull=True)
-                .values_list("phone_number", flat=True)
+                .exclude(customer__phone__isnull=True)
+                .values_list("customer__phone", flat=True)
             )
             + list(
                 Order.objects.filter(restaurant=restaurant)
-                .exclude(phone__isnull=True)
-                .values_list("phone", flat=True)
+                .exclude(customer__phone__isnull=True)
+                .values_list("customer__phone", flat=True)
             )
             + list(
                 CustomerService.objects.filter(restaurant=restaurant)
-                .exclude(phone_number__isnull=True)
-                .values_list("phone_number", flat=True)
+                .exclude(customer__phone__isnull=True)
+                .values_list("customer__phone", flat=True)
             )
         )
 
         customer_data = {}
 
         for phone in phones:
-            # Latest Reservation
-            last_res = (
-                Reservation.objects.filter(table__restaurant=restaurant, phone_number=phone)
-                .order_by("-created_at")
-                .first()
-            )
-            res_count = Reservation.objects.filter(table__restaurant=restaurant, phone_number=phone).count()
+            # Get the latest record from Reservation, Order, CustomerService
+            last_res = Reservation.objects.filter(table__restaurant=restaurant, customer__phone=phone).order_by("-created_at").first()
+            res_count = Reservation.objects.filter(table__restaurant=restaurant, customer__phone=phone).count()
 
-            # Latest Order
-            last_order = (
-                Order.objects.filter(restaurant=restaurant, phone=phone)
-                .order_by("-created_at")
-                .first()
-            )
-            order_count = Order.objects.filter(restaurant=restaurant, phone=phone).count()
+            last_order = Order.objects.filter(restaurant=restaurant, customer__phone=phone).order_by("-created_at").first()
+            order_count = Order.objects.filter(restaurant=restaurant, customer__phone=phone).count()
 
-            # Latest Service
-            last_service = (
-                CustomerService.objects.filter(restaurant=restaurant, phone_number=phone)
-                .order_by("-created_at")
-                .first()
-            )
-            service_count = CustomerService.objects.filter(restaurant=restaurant, phone_number=phone).count()
+            last_service = CustomerService.objects.filter(restaurant=restaurant, customer__phone=phone).order_by("-created_at").first()
+            service_count = CustomerService.objects.filter(restaurant=restaurant, customer__phone=phone).count()
 
-             # List of non-None records
-            records = [last_res, last_order, last_service]
-
-            # Filter out None values before finding the latest record
-            records = [record for record in records if record is not None]
-
-            # Pick the most recent record
-            latest_record = max(records, key=lambda x: x.created_at if x else None) if records else None
+            # Determine latest record
+            records = [r for r in [last_res, last_order, last_service] if r is not None]
+            latest_record = max(records, key=lambda x: x.created_at) if records else None
 
             if latest_record:
                 if isinstance(latest_record, Reservation):
                     last_type = "reservation"
-                    name = latest_record.customer_name
+                    name = latest_record.customer.customer_name if latest_record.customer else None
                 elif isinstance(latest_record, Order):
                     last_type = "order"
-                    name = latest_record.customer_name
+                    name = latest_record.customer.customer_name if latest_record.customer else None
                 elif isinstance(latest_record, CustomerService):
                     last_type = "service"
-                    name = latest_record.customer_name
+                    name = latest_record.customer.customer_name if latest_record.customer else None
                 else:
                     last_type, name = None, None
             else:
@@ -483,7 +469,6 @@ class RestaurantFullDataAPIView(APIView):
                 },
                 "total_create": res_count + order_count + service_count,
             }
-
 
         # Ensure the duration is a valid integer by rounding or converting it
         # Use correct SQL syntax for CAST and ensure duration is handled as a float before casting to integer
@@ -554,6 +539,14 @@ class RestaurantFullDataAPIView(APIView):
                 }
                 for item in items
             ],
+            "extras": [
+                {
+                    "id": extra.id,
+                    "extras": extra.extras,
+                    "extras_price": str(extra.extras_price),
+                    "update_at": extra.update_at,
+                } for extra in extras
+            ],
             "tables": [
                 {
                     "id": table.id,
@@ -581,5 +574,50 @@ class RestaurantFullDataAPIView(APIView):
         return Response(data, status=status.HTTP_200_OK)
     
 
+
+
+class AdminRestaurantDeleteAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Delete a restaurant and its owner user (admin only).",
+        manual_parameters=[
+            openapi.Parameter(
+                'id',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_INTEGER,
+                required=True,
+                description='Restaurant ID to delete'
+            )
+        ],
+        responses={
+            200: "Restaurant and owner deleted successfully.",
+            400: "Bad Request: Missing or invalid ID.",
+            404: "Not Found: Restaurant does not exist.",
+            403: "Forbidden: Only admins can access this endpoint."
+        },
+        tags=['Users'],
+    )
+    def delete(self, request):
+        restaurant_id = request.query_params.get("id")
+        if not restaurant_id:
+            return Response({"error": "Restaurant ID is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            restaurant = Restaurant.objects.get(id=restaurant_id)
+        except Restaurant.DoesNotExist:
+            return Response({"error": "Restaurant not found."},
+                            status=status.HTTP_404_NOT_FOUND)
+        
+        owner_user = restaurant.owner
+
+        restaurant.delete()
+        owner_user.delete()
+
+        return Response(
+            {"message": "Restaurant and owner deleted successfully."},
+            status=status.HTTP_200_OK
+        )
 
 

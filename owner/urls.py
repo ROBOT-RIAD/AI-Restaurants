@@ -1,5 +1,6 @@
 from django.urls import path,include
 from rest_framework.routers import DefaultRouter
+from customer.views import CustomerViewSet
 
 from restaurants.views import OpenAndCloseTimeAPIView, OpenAndCloseTimeDetailAPIView
 from .views import UserRestaurantDetailView,UpdateRestaurantInfo,RestaurantStatsAPIView,RestaurantMonthlyStatsAPIView
@@ -9,8 +10,12 @@ from order.views import OrderCreateAPIView,OrderUpdateAPIView,RestaurantOrdersVi
 from customerService.views import CustomerSummaryAPIView,PendingCallbacksView
 from AIvapi.views import UserCallInformationAPIView,UserSingleCallInformationAPIView,UpdateCallCallbackAPIView,UpdateVoiceIdAPIView,UpdateTwilioCredsAPIView,GetRestaurantAssistantAPIView
 from support.views import CreateSupportView
+from extras.views import ExtraViewSet
 from delivery_management.views import AreaManagementListCreateView, AreaManagementDetailView
 router = DefaultRouter()
+
+router.register("customers", CustomerViewSet, basename="customers")
+router.register(r'extras', ExtraViewSet, basename='extras')
 
 
 urlpatterns = [

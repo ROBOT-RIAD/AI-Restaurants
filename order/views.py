@@ -341,7 +341,7 @@ class CustomerOrdersByPhoneAPIView(APIView):
         responses={
             200: openapi.Response(
                 description="List of customer orders with aggregated customer info",
-                schema=CustomerOrderGroupSerializer(many=True)  # ✅ use serializer
+                schema=CustomerOrderGroupSerializer(many=True) 
             ),
             400: "Phone number is required",
             401: "Unauthorized",
@@ -354,7 +354,7 @@ class CustomerOrdersByPhoneAPIView(APIView):
             return Response({"error": "Phone number is required"}, status=400)
 
         restaurants = Restaurant.objects.filter(owner=request.user)
-        orders = Order.objects.filter(restaurant__in=restaurants, phone=phone)
+        orders = Order.objects.filter(restaurant__in=restaurants, customer__phone=phone)
 
         if not orders.exists():
             return Response({"error": "No orders found"}, status=404)

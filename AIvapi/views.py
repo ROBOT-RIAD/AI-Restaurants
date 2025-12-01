@@ -22,6 +22,7 @@ from .update_agent import UpdateAgent
 from restaurants.models import Restaurant,OpenAndCloseTime
 import pytz
 from accounts.permissions import IsAdminOrOwner
+from customer.models import Customer
 
 VAPI_API = settings.VAPI_API
 
@@ -332,6 +333,14 @@ class VapiWebhookAsyncAPIView(APIView):
                         if not (day_schedule.opening_time <= call_time <= day_schedule.closing_time):
                             callback_value = False
 
+
+            phone_number = parsed.get("phone")
+            customer_name = None
+            if phone_number:
+                customer = Customer.objects.filter(phone=phone_number).first()
+                if customer:
+                    customer_name = customer.customer_name
+
             # Save to DB
             call_info = CallInformations.objects.create(
                 type=parsed.get("type"),
@@ -343,6 +352,7 @@ class VapiWebhookAsyncAPIView(APIView):
                 callback=callback_value,
                 assistant_id=parsed.get("assistant_id") or "",
                 cost=parsed.get("cost") or 0,
+                customer_name=customer_name
             )
 
             serializer = CallInformationsSerializer(call_info)

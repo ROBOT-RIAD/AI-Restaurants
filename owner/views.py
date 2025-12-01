@@ -273,25 +273,25 @@ class RestaurantStatsAPIView(APIView):
 
         # Aggregate by phone (customer)
         customer_order_counts = (
-            orders.values('phone')
+            orders.values('customer__phone')
             .annotate(order_count=Count('id'), total_spent=Sum('total_price'))
         )
 
         # Separate new vs returning customers
-        new_customers = [c['phone'] for c in customer_order_counts if c['order_count'] == 1]
-        returning_customers = [c['phone'] for c in customer_order_counts if c['order_count'] > 1]
+        new_customers = [c['customer__phone'] for c in customer_order_counts if c['order_count'] == 1]
+        returning_customers = [c['customer__phone'] for c in customer_order_counts if c['order_count'] > 1]
 
         # Revenue splits
         new_customer_revenue = (
-            orders.filter(phone__in=new_customers).aggregate(total=Sum('total_price'))['total'] or 0
+            orders.filter(customer__phone__in=new_customers).aggregate(total=Sum('total_price'))['total'] or 0
         )
         returning_customer_revenue = (
-            orders.filter(phone__in=returning_customers).aggregate(total=Sum('total_price'))['total'] or 0
+            orders.filter(customer__phone__in=returning_customers).aggregate(total=Sum('total_price'))['total'] or 0
         )
 
         # Order counts
-        number_of_new_customer_orders = orders.filter(phone__in=new_customers).count()
-        number_of_returning_customer_orders = orders.filter(phone__in=returning_customers).count()
+        number_of_new_customer_orders = orders.filter(customer__phone__in=new_customers).count()
+        number_of_returning_customer_orders = orders.filter(customer__phone__in=returning_customers).count()
 
         # Percentages
         new_customer_order_percentage = (
@@ -309,15 +309,15 @@ class RestaurantStatsAPIView(APIView):
 
         # Group by phone
         reservation_counts = (
-            reservations.values('phone_number')
+            reservations.values('customer__phone')
             .annotate(res_count=Count('id'))
         )
 
-        new_reservation_customers = [r['phone_number'] for r in reservation_counts if r['res_count'] == 1]
-        returning_reservation_customers = [r['phone_number'] for r in reservation_counts if r['res_count'] > 1]
+        new_reservation_customers = [r['customer__phone'] for r in reservation_counts if r['res_count'] == 1]
+        returning_reservation_customers = [r['customer__phone'] for r in reservation_counts if r['res_count'] > 1]
 
-        number_of_new_customer_reservations = reservations.filter(phone_number__in=new_reservation_customers).count()
-        number_of_returning_customer_reservations = reservations.filter(phone_number__in=returning_reservation_customers).count()
+        number_of_new_customer_reservations = reservations.filter(customer__phone__in=new_reservation_customers).count()
+        number_of_returning_customer_reservations = reservations.filter(customer__phone__in=returning_reservation_customers).count()
 
         # Percentages
         new_customer_reservation_percentage = (

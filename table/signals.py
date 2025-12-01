@@ -43,10 +43,13 @@ def send_twilio_sms_via_assistance(restaurant, body, to_phone):
 
 def send_reservation_verified_email(reservation):
     """Send a verification email when user already has an unfinished reservation."""
-    if not reservation.email:
+    if not reservation.customer or not reservation.customer.email:
         return
     
-    verify_link = f"http://10.10.13.26:9002/public/reservations/verify/{reservation.id}/"
+    customer_name = reservation.customer.customer_name
+    customer_email = reservation.customer.email
+    
+    verify_link = f"https://api.trusttaste.ai/public/reservations/verify/{reservation.id}/"
 
     subject = f"🔔 Verify Your Reservation (ID: {reservation.id})"
     message = format_html(f"""
@@ -60,7 +63,7 @@ def send_reservation_verified_email(reservation):
         <div style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             
             <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="font-size: 24px; color: #007bff; margin: 0;">Hello {reservation.customer_name},</h3>
+                <h3 style="font-size: 24px; color: #007bff; margin: 0;">Hello {customer_name},</h3>
             </div>
 
             <div style="font-size: 16px; line-height: 1.6; color: #555; margin-bottom: 20px;">
@@ -92,8 +95,8 @@ def send_reservation_verified_email(reservation):
     send_mail(
         subject,
         message,
-        settings.EMAIL_HOST_USER,
-        [reservation.email],
+        settings.DEFAULT_FROM_EMAIL,
+        [customer_email],
         html_message=message
     )
 
@@ -101,15 +104,17 @@ def send_reservation_verified_email(reservation):
 
 def send_reservation_confirmation_email_manual(reservation):
     """Send reservation confirmation email (can be used in signals or manually)."""
-    if not reservation.email:
+    if not reservation.customer or not reservation.customer.email:
         return
+    
 
+    customer = reservation.customer
     table = reservation.table
     restaurant = table.restaurant
 
-    customer_name = reservation.customer_name
-    customer_email = reservation.email
-    customer_phone = reservation.phone_number
+    customer_name = customer.customer_name
+    customer_email = customer.email
+    customer_phone = customer.phone
     customer_guest_no = reservation.guest_no
     customer_from_time = reservation.from_time.strftime('%I:%M %p')
     customer_to_time = reservation.to_time.strftime('%I:%M %p')
@@ -119,8 +124,7 @@ def send_reservation_confirmation_email_manual(reservation):
     restaurant_phone2 = restaurant.twilio_number
     website = getattr(restaurant, "website", "")
     restaurant_address = restaurant.address
-    opening_time = restaurant.opening_time.strftime('%H:%M') if restaurant.opening_time else "Not Set"
-    closing_time = restaurant.closing_time.strftime('%H:%M') if restaurant.closing_time else "Not Set"
+
 
     subject = "Reservation Confirmation"
     message = format_html(
@@ -145,8 +149,6 @@ def send_reservation_confirmation_email_manual(reservation):
             <li><b>Phone Online:</b> {restaurant_phone2}</li>
             <li><b>Address:</b> {restaurant_address}</li>
             <li><b>Website:</b> {website}</li>
-            <li><b>Opening Time:</b> {opening_time}</li>
-            <li><b>Closing Time:</b> {closing_time}</li>
         </ul>
         <p>We look forward to welcoming you!</p>
         <p>For any inquiries, feel free to contact us.</p>
@@ -160,8 +162,6 @@ def send_reservation_confirmation_email_manual(reservation):
         restaurant_phone1=restaurant_phone1,
         restaurant_phone2=restaurant_phone2,
         website=website,
-        opening_time=opening_time,
-        closing_time=closing_time,
         customer_name=customer_name,
         customer_phone=customer_phone,
         customer_guest_no=customer_guest_no,
@@ -172,7 +172,7 @@ def send_reservation_confirmation_email_manual(reservation):
     send_mail(
         subject,
         message,
-        settings.EMAIL_HOST_USER,
+        settings.DEFAULT_FROM_EMAIL,
         [customer_email],
         html_message=message
     )
@@ -187,9 +187,9 @@ def send_reservation_confirmation_email(sender, instance, created, **kwargs):
     reservation = instance
 
     # Check if this customer already has unfinished reservations
-    if reservation.phone_number:
+    if reservation.customer and reservation.customer.phone:
         unfinished_reservations = Reservation.objects.filter(
-            phone_number=reservation.phone_number
+            customer__phone=reservation.customer.phone
         ).exclude(status='finished')
         if unfinished_reservations.exclude(id=reservation.id).exists():
             send_reservation_verified_email(reservation)
@@ -318,7 +318,7 @@ from .tasks import send_reservation_reminder_email, send_reservation_reminder_sm
 @receiver(post_save, sender=Reservation)
 def schedule_reservation_reminder(sender, instance, created, **kwargs):
     """Schedule reminder 30 minutes before reservation starts"""
-    if created:
+    if created and instance.customer:
         reservation_datetime = datetime.combine(instance.date, instance.from_time)
         reservation_datetime = timezone.make_aware(reservation_datetime, timezone.get_current_timezone())
 
@@ -327,20 +327,20 @@ def schedule_reservation_reminder(sender, instance, created, **kwargs):
         if reminder_time > timezone.now():
             subject = "Reservation Reminder"
             message = f"""
-                Hi {instance.customer_name},
+                Hi {instance.customer.customer_name},
 
                 This is a reminder that your reservation at {instance.table.restaurant.resturent_name}
                 is scheduled for {reservation_datetime.strftime('%Y-%m-%d %I:%M %p')}.
                 We look forward to seeing you!
             """
 
-            if instance.email:
+            if instance.customer.email:
                 send_reservation_reminder_email.apply_async(
-                    args=[instance.email, subject, message],
+                    args=[instance.customer.email, subject, message],
                     eta=reminder_time
                 )
 
-            # if instance.phone_number:
+            # if instance.customer.phone:
             #     sms_text = (
             #         f"Reminder: Hi {instance.customer_name}, your reservation at "
             #         f"{instance.table.restaurant.resturent_name} starts at "

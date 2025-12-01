@@ -4,6 +4,7 @@ from .constants import STATUS_CHOICES , RESERVATION_STATUS_CHOICES,RESERVATION_S
 from datetime import datetime, timedelta
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from customer.models import Customer
 # Create your models here.
 
 
@@ -27,16 +28,13 @@ class Table(models.Model):
 
 
 class Reservation(models.Model):
-    customer_name = models.CharField(max_length=255, help_text="Name of the customer")
-    phone_number = models.CharField(blank=True, null=True,max_length=15, help_text="Customer's phone number")
+    customer = models.ForeignKey(Customer,on_delete=models.SET_NULL,related_name='reservations',help_text="Customer who made the reservation",null=True)
     guest_no = models.IntegerField(help_text="Number of guests in the reservation")
     status = models.CharField(max_length=20, choices=RESERVATION_STATUS, default='reserved', help_text="Reservation status")
     date = models.DateField(help_text="Reservation date")
     from_time = models.TimeField(help_text="Reservation start time (hh:mm:ss format)")
     to_time = models.TimeField(help_text="Reservation end time (hh:mm:ss format)")
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='reservations', help_text="Table reserved")
-    email = models.EmailField(blank=True, null=True, help_text="Customer's email address (optional)")
-    address = models.TextField(null=True, blank=True)
     allergy = models.TextField(null=True, blank=True)
     verified = models.BooleanField(default=True,null=True, blank=True)
     
@@ -44,9 +42,12 @@ class Reservation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Reservation for {self.customer_name} on {self.date} from {self.from_time} to {self.to_time}"
-    
-    
+        customer_name = self.customer.customer_name if self.customer else "Unknown Customer"
+        return f"Reservation for {customer_name} on {self.date} from {self.from_time} to {self.to_time}"
+
+
+   
+
 
 
 

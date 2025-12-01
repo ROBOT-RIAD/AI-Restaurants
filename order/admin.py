@@ -4,30 +4,52 @@ from .models import Order, OrderItem
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'restaurant', 'customer_name', 'email', 'status', 'total_price',
-        'phone', 'verified', 'created_at', 'updated_at'
+        'id', 'restaurant', 'get_customer_name', 'get_email', 'status', 'total_price',
+        'get_phone', 'verified', 'created_at', 'updated_at'
     )
-    search_fields = ('customer_name', 'email', 'status', 'restaurant__resturent_name')
-    list_filter = ('status', 'restaurant', 'verified', 'created_at')
-    ordering = ('-created_at',)
-    readonly_fields = ('created_at', 'updated_at', 'delivery_area_json')
 
-    # Group fields into sections
+    readonly_fields = (
+        'created_at', 'updated_at', 'delivery_area_json',
+        'get_customer_name', 'get_email', 'get_phone', 'get_address'
+    )
+
     fieldsets = (
         (None, {
-            'fields': ('restaurant', 'customer_name', 'email', 'status', 'total_price', 'verified')
+            'fields': ('restaurant', 'status', 'total_price', 'verified')
         }),
-        ('Contact Information', {
-            'fields': ('phone', 'address', 'order_notes', 'allergy')
+        ('Customer Information', {
+            'fields': (
+                'get_customer_name',
+                'get_email',
+                'get_phone',
+                'get_address',
+            )
         }),
         ('Delivery Area', {
             'fields': ('delivery_area', 'delivery_area_json')
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': (),
             'classes': ('collapse',)
         }),
     )
+
+    # Methods to display customer info
+    def get_customer_name(self, obj):
+        return obj.customer.customer_name if obj.customer else "-"
+    get_customer_name.short_description = "Customer Name"
+
+    def get_email(self, obj):
+        return obj.customer.email if obj.customer else "-"
+    get_email.short_description = "Email"
+
+    def get_phone(self, obj):
+        return obj.customer.phone if obj.customer else "-"
+    get_phone.short_description = "Phone"
+
+    def get_address(self, obj):
+        return obj.customer.address if obj.customer else "-"
+    get_address.short_description = "Address"
 
 
 
