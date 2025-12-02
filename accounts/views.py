@@ -28,6 +28,8 @@ from delivery_management.models import AreaManagement
 from datetime import time
 from customer.models import Customer
 from extras.models import Extra
+from AIvapi.delete_agent import delete_agent
+from AIvapi.models import Assistance
 
 
 
@@ -609,6 +611,18 @@ class AdminRestaurantDeleteAPIView(APIView):
         except Restaurant.DoesNotExist:
             return Response({"error": "Restaurant not found."},
                             status=status.HTTP_404_NOT_FOUND)
+        
+        assistance = getattr(restaurant, "ai_assistance", None)
+
+        if assistance:
+            try:
+                delete_agent(assistance.assistant_id, assistance.vapi_phone_number_id)
+                assistance.delete()
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to delete AI Assistant from VAPI: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
         
         owner_user = restaurant.owner
 

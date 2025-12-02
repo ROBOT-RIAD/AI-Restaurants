@@ -21,8 +21,9 @@ from datetime import datetime
 from .update_agent import UpdateAgent
 from restaurants.models import Restaurant,OpenAndCloseTime
 import pytz
-from accounts.permissions import IsAdminOrOwner
+from accounts.permissions import IsAdminOrOwner,IsAdminRole
 from customer.models import Customer
+from .delete_agent import delete_agent
 
 VAPI_API = settings.VAPI_API
 
@@ -630,3 +631,63 @@ class GetRestaurantAssistantAPIView(APIView):
 
         serializer = AssistanceSerializer(assistant)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+class DeleteRestaurantsAssistantAPIView(APIView):
+    permission_classes = [IsAdminRole]
+
+    @swagger_auto_schema(
+        operation_description="Delete an AI Assistant by restaurant ID.",
+        manual_parameters=[
+            openapi.Parameter(
+                'restaurant_id',
+                openapi.IN_PATH,
+                description="Restaurant ID",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            )
+        ],
+        tags=["VAPI"]
+    )
+    def delete(self, request, restaurant_id):
+        try:
+            restaurant = Restaurant.objects.get(id=restaurant_id)
+        except Restaurant.DoesNotExist:
+            return Response(
+                {"error": "Restaurant not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2. Assistance Check
+        try:
+            assistance = restaurant.ai_assistance
+        except Assistance.DoesNotExist:
+            return Response(
+                {"error": "AI Assistant does not exist for this restaurant."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        try:
+            delete_agent(
+                assistance.assistant_id,
+                assistance.vapi_phone_number_id
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"VAPI delete failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        assistance.delete()
+
+        return Response(
+            {"message": "AI Assistant & phone number deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+
+        
+
+
+
