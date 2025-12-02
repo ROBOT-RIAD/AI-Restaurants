@@ -221,6 +221,7 @@ SIMPLE_JWT = {
 DEEPL= os.getenv('DEEPL')
 
 SWAGGER_SETTINGS = {
+    'DEFAULT_API_URL': ['https://api.trusttaste.ai', 'http://localhost:8000'],
     'SECURITY_DEFINITIONS': {
         'Bearer': {
             'type': 'apiKey',
