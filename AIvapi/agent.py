@@ -49,6 +49,9 @@ class AGENT:
                 restaurant_fallback=restaurant_fallback,
                 auth_token=auth_token, 
                 assistant=assistant)
+            
+            if response.get("status") != "success":
+             raise Exception(f"Failed to create phone number. API response: {response}")
  
             return response
         except Exception as e:
