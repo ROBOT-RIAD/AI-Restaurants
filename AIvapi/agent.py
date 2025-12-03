@@ -1,5 +1,6 @@
 from .create_assistant import create_assistant
 from .add_phone import create_phone_number
+from rest_framework.response import Response
 
 from django.conf import settings
 
@@ -126,7 +127,12 @@ class AGENT:
             self.restaurant_name = None
             self.assistant_id = None
             self.org_id = None
+
+            return Response(
+                {"Number is already in use or missing key in response."},
+                status=400
+            )
             
-            raise Exception(f"Number is already in use or missing key in response: {e}")
+            # raise Exception(f"Number is already in use or missing key in response: {e}")
 
         return [assistant_response, number_assignment]
