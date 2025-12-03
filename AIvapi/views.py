@@ -681,6 +681,8 @@ class DeleteRestaurantsAssistantAPIView(APIView):
             )
         
         assistance.delete()
+        restaurant.twilio_number = None
+        restaurant.save()
 
         return Response(
             {"message": "AI Assistant & phone number deleted successfully."},
