@@ -93,6 +93,13 @@ class AGENT:
         if not assistant_response:
             raise Exception("Failed to create assistant.")
         
+        required_assistant_keys = ["id", "name", "orgId", "voice"]
+        for key in required_assistant_keys:
+            if key not in assistant_response:
+                raise Exception(
+                    f"Assistant creation failed OR missing field '{key}' in assistant API response."
+                )
+        
         self.restaurant_name = restaurant_name
         
         number_assignment = self.__create_number(
