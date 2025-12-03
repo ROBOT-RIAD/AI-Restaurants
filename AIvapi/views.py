@@ -95,6 +95,13 @@ class AssistantCreateView(APIView):
         twilio_auth_token = data["twilio_auth_token"]
 
 
+        phone_number_1 = restaurant.phone_number_1
+        if not re.match(r'^\+\d{1,4}\d{6,14}$', phone_number_1):
+            return Response(
+                {"You must add a country code to the phone number. It should start with a '+' followed by the country code."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if hasattr(restaurant, "ai_assistance"):
             return Response(
                 {"error": "Assistant already exists for this restaurant."},
