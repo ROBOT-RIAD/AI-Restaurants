@@ -98,7 +98,7 @@ class AssistantCreateView(APIView):
         phone_number_1 = restaurant.phone_number_1
         if not re.match(r'^\+\d{1,4}\d{6,14}$', phone_number_1):
             return Response(
-                error = "You must add a country code to the phone number. It should start with a '+' followed by the country code.",
+                {"error": "You must add a country code to the phone number. It should start with a '+' followed by the country code."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
