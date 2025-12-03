@@ -81,6 +81,12 @@ class AssistantCreateView(APIView):
         
         data = serializer.validated_data
 
+        if Assistance.objects.filter(twilio_number=data["twilio_number"]).exists():
+            return Response(
+                {"error": "This Twilio number is already in use."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             restaurant = Restaurant.objects.get(id=restaurant_id)
         except Restaurant.DoesNotExist:
