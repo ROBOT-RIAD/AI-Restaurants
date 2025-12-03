@@ -49,10 +49,6 @@ class AGENT:
                 restaurant_fallback=restaurant_fallback,
                 auth_token=auth_token, 
                 assistant=assistant)
-            
-            if response.get("status") != "success":
-             raise Exception(f"Failed to create phone number. API response: {response}")
- 
             return response
         except Exception as e:
             raise Exception(f"Failed to create phone number: {e}")
@@ -95,6 +91,13 @@ class AGENT:
             )
         if not assistant_response:
             raise Exception("Failed to create assistant.")
+        
+        required_assistant_keys = ["id", "name", "orgId", "voice"]
+        for key in required_assistant_keys:
+            if key not in assistant_response:
+                raise Exception(
+                    f"Assistant creation failed OR missing field '{key}' in assistant API response."
+                )
         
         self.restaurant_name = restaurant_name
         
