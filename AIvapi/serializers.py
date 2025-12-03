@@ -10,7 +10,7 @@ class AssistanceCreateSerializer(serializers.Serializer):
 
     def validate(self, data):
         if Assistance.objects.filter(twilio_number=data["twilio_number"]).exists():
-            raise serializers.ValidationError("This Twilio number is already in use.")
+            raise serializers.ValidationError({"error": "This Twilio number is already in use."})
         return data
 
 
