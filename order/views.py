@@ -363,9 +363,6 @@ class CustomerOrdersByPhoneAPIView(APIView):
         services = CustomerService.objects.filter(restaurant__in=restaurants, customer__phone=phone)
 
 
-        if not orders.exists():
-            return Response({"error": "No orders found"}, status=404)
-
         serializer = CustomerOrderGroupSerializer({"orders": orders})
         return Response({
             "orders": serializer.data,
