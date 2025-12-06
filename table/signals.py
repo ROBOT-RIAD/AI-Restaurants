@@ -191,7 +191,7 @@ def send_reservation_confirmation_email(sender, instance, created, **kwargs):
         unfinished_reservations = Reservation.objects.filter(
             customer__phone=reservation.customer.phone
         ).exclude(status='finished')
-        if unfinished_reservations.exclude(id=reservation.id).exists():
+        if not unfinished_reservations.exclude(id=reservation.id).exists():
             send_reservation_verified_email(reservation)
             return
 
