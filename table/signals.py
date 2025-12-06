@@ -179,24 +179,56 @@ def send_reservation_confirmation_email_manual(reservation):
 
 
 
+# @receiver(post_save, sender=Reservation)
+# def send_reservation_confirmation_email(sender, instance, created, **kwargs):
+#     """
+#     Signal to send reservation confirmation when reservation is first created.
+#     """
+#     reservation = instance
+
+#     # Check if this customer already has unfinished reservations
+#     if reservation.customer and reservation.customer.phone:
+#         unfinished_reservations = Reservation.objects.filter(
+#             customer__phone=reservation.customer.phone
+#         ).exclude(status='finished')
+#         if not unfinished_reservations.exclude(id=reservation.id).exists():
+#             send_reservation_verified_email(reservation)
+#             return
+
+#     if created:
+#         send_reservation_confirmation_email_manual(reservation)
+
+
+
 @receiver(post_save, sender=Reservation)
 def send_reservation_confirmation_email(sender, instance, created, **kwargs):
     """
-    Signal to send reservation confirmation when reservation is first created.
+    Send:
+      - send_reservation_verified_email       → if user HAS finished reservation
+      - send_reservation_confirmation_email_manual → if user does NOT have finished reservation
     """
+    if not created:
+        return  # Only run on creation
+
     reservation = instance
+    customer = reservation.customer
 
-    # Check if this customer already has unfinished reservations
-    if reservation.customer and reservation.customer.phone:
-        unfinished_reservations = Reservation.objects.filter(
-            customer__phone=reservation.customer.phone
-        ).exclude(status='finished')
-        if not unfinished_reservations.exclude(id=reservation.id).exists():
-            send_reservation_verified_email(reservation)
-            return
+    if not customer or not customer.phone:
+        return
 
-    if created:
+    # Check if customer has ANY finished reservation
+    has_finished_reservation = Reservation.objects.filter(
+        customer__phone=customer.phone,
+        status='finished'
+    ).exists()
+
+    if has_finished_reservation:
+        # Customer has finished previous reservation → send verified email
+        send_reservation_verified_email(reservation)
+    else:
+        # No finished reservation found → send confirmation email
         send_reservation_confirmation_email_manual(reservation)
+
 
 
 
