@@ -455,6 +455,7 @@ class ReservationCreateAPIView(APIView):
                 ).exclude(status='finished').exists()
                 if has_unfinished:
                     verified_status = False
+                print("❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️",verified_status)
             reservation = serializer.save(verified=verified_status,customer=customer)
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
