@@ -39,7 +39,8 @@ class ReservationSerializer(serializers.ModelSerializer):
     table_name = TableNameSerializer(source='table', read_only=True)
     guest_no = serializers.IntegerField(required = False)
     date = serializers.DateField(required = False)
-    allergy = serializers.CharField(required = False)
+    allergy = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
 
     table = serializers.PrimaryKeyRelatedField(queryset=Table.objects.all(), required=False)
     class Meta:
