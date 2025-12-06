@@ -18,6 +18,10 @@ from rest_framework.permissions import AllowAny
 from .emails import send_order_confirmation_email
 from accounts.serializers import RestaurantSerializer
 from datetime import datetime
+from table.models import Reservation
+from customerService.models import CustomerService
+from table.serializers import ReservationSerializer
+from customerService.serializers import CustomerServiceSerializer
 
 
 
@@ -355,12 +359,19 @@ class CustomerOrdersByPhoneAPIView(APIView):
 
         restaurants = Restaurant.objects.filter(owner=request.user)
         orders = Order.objects.filter(restaurant__in=restaurants, customer__phone=phone)
+        reservations = Reservation.objects.filter(table__restaurant__in=restaurants, customer__phone=phone)
+        services = CustomerService.objects.filter(restaurant__in=restaurants, customer__phone=phone)
+
 
         if not orders.exists():
             return Response({"error": "No orders found"}, status=404)
 
         serializer = CustomerOrderGroupSerializer({"orders": orders})
-        return Response(serializer.data, status=200)
+        return Response({
+            "orders": serializer.data,
+            "reservations": ReservationSerializer(reservations, many=True).data,
+            "services": CustomerServiceSerializer(services, many=True).data,
+        }, status=200)
 
 
 
