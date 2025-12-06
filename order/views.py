@@ -22,6 +22,8 @@ from table.models import Reservation
 from customerService.models import CustomerService
 from table.serializers import ReservationSerializer
 from customerService.serializers import CustomerServiceSerializer
+from django.db import models
+from customer.models import Customer
 
 
 
@@ -342,30 +344,44 @@ class CustomerOrdersByPhoneAPIView(APIView):
                 required=True
             )
         ],
-        responses={
-            200: openapi.Response(
-                description="List of customer orders with aggregated customer info",
-                schema=CustomerOrderGroupSerializer(many=True) 
-            ),
-            400: "Phone number is required",
-            401: "Unauthorized",
-        },
         tags=["customer Api"]
     )
     def get(self, request):
         phone = request.query_params.get("phone")
         if not phone:
             return Response({"error": "Phone number is required"}, status=400)
+        
+
 
         restaurants = Restaurant.objects.filter(owner=request.user)
+
+        customer = Customer.objects.filter(phone=phone).first()
+        if not customer:
+            return Response({"error": "Customer not found"}, status=404)
+        
         orders = Order.objects.filter(restaurant__in=restaurants, customer__phone=phone)
+
+        total_order = orders.count()
+        total_order_price = orders.aggregate(total=models.Sum("total_price"))["total"] or 0
+        first_order_date = orders.order_by("created_at").first().created_at if orders.exists() else None
+        last_order_date = orders.order_by("-created_at").first().created_at if orders.exists() else None
+
         reservations = Reservation.objects.filter(table__restaurant__in=restaurants, customer__phone=phone)
         services = CustomerService.objects.filter(restaurant__in=restaurants, customer__phone=phone)
 
 
-        serializer = CustomerOrderGroupSerializer({"orders": orders})
         return Response({
-            "orders": serializer.data,
+            "customer": {
+                "customer_name": customer.customer_name,
+                "email": customer.email,
+                "phone": customer.phone,
+                "address": customer.address,
+                "total_order": total_order,
+                "total_order_price": total_order_price,
+                "first_order_date": first_order_date,
+                "last_order_date": last_order_date,
+            },
+            "orders": OrderSerializer(orders, many=True).data,
             "reservations": ReservationSerializer(reservations, many=True).data,
             "services": CustomerServiceSerializer(services, many=True).data,
         }, status=200)
