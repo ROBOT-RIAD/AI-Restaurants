@@ -186,17 +186,16 @@ def send_reservation_confirmation_email(sender, instance, created, **kwargs):
     """
     reservation = instance
 
-    
+    # Check if this customer already has unfinished reservations
+    if reservation.customer and reservation.customer.phone:
+        unfinished_reservations = Reservation.objects.filter(
+            customer__phone=reservation.customer.phone
+        ).exclude(status='finished')
+        if unfinished_reservations.exclude(id=reservation.id).exists():
+            send_reservation_verified_email(reservation)
+            return 
 
     if created:
-        # Check if this customer already has unfinished reservations
-        if reservation.customer and reservation.customer.phone:
-            unfinished_reservations = Reservation.objects.filter(
-                customer__phone=reservation.customer.phone
-            ).exclude(status='finished')
-            if  unfinished_reservations.exclude(id=reservation.id).exists():
-                send_reservation_verified_email(reservation)
-                return
         send_reservation_confirmation_email_manual(reservation)
 
 
