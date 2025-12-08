@@ -179,24 +179,65 @@ def send_reservation_confirmation_email_manual(reservation):
 
 
 
+# @receiver(post_save, sender=Reservation)
+# def send_reservation_confirmation_email(sender, instance, created, **kwargs):
+#     """
+#     Signal to send reservation confirmation when reservation is first created.
+#     """
+#     reservation = instance
+
+#     # Check if this customer already has unfinished reservations
+#     if reservation.customer and reservation.customer.phone:
+#         unfinished_reservations = Reservation.objects.filter(
+#             customer__phone=reservation.customer.phone
+#         ).exclude(status='finished')
+#         if not unfinished_reservations.exclude(id=reservation.id).exists():
+#             send_reservation_verified_email(reservation)
+#             return
+
+#     if created:
+#         send_reservation_confirmation_email_manual(reservation)
+
+
 @receiver(post_save, sender=Reservation)
 def send_reservation_confirmation_email(sender, instance, created, **kwargs):
     """
     Signal to send reservation confirmation when reservation is first created.
     """
+    if not created:
+        return  # Only run when reservation is first created
+
     reservation = instance
+    phone = reservation.customer.phone if reservation.customer else None
 
-    # Check if this customer already has unfinished reservations
-    if reservation.customer and reservation.customer.phone:
-        unfinished_reservations = Reservation.objects.filter(
-            customer__phone=reservation.customer.phone
-        ).exclude(status='finished')
-        if not unfinished_reservations.exclude(id=reservation.id).exists():
-            send_reservation_verified_email(reservation)
-            return
+    if not phone:
+        return  # No phone = no email condition
 
-    if created:
-        send_reservation_confirmation_email_manual(reservation)
+    # All reservations for this customer
+    all_reservations = Reservation.objects.filter(
+        customer__phone=phone
+    )
+
+    # Finished reservations
+    finished_reservations = all_reservations.filter(status='finished')
+
+    # -------------------------
+    #      BUSINESS LOGIC
+    # -------------------------
+
+    # 1️⃣ CASE: No previous reservations → send verified email
+    if all_reservations.count() == 1:
+        # This is the first reservation ever
+        send_reservation_verified_email(reservation)
+        return
+
+    # 2️⃣ CASE: No finished reservations exist → send verified email
+    if not finished_reservations.exists():
+        send_reservation_verified_email(reservation)
+        return
+
+    # 3️⃣ CASE: At least one finished reservation exists → send manual confirmation
+    send_reservation_confirmation_email_manual(reservation)
 
 
 
