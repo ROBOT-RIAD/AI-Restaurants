@@ -4,6 +4,7 @@ STATUS_CHOICES = [
         ('in_preparation', 'In Preparation'),
         ('out_for_delivery', 'Out for delivery'),
         ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
 ]
 
 
