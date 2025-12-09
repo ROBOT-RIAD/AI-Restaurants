@@ -287,6 +287,7 @@ class RestaurantOrdersView(APIView):
 
         orders = (
             Order.objects.filter(restaurant=restaurant)
+            .exclude(status='cancelled')
             .prefetch_related("order_items__item")
         )
 
