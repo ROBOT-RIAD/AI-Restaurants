@@ -372,6 +372,7 @@ class CustomerOrdersByPhoneAPIView(APIView):
 
         return Response({
             "customer": {
+                "id": customer.id,
                 "customer_name": customer.customer_name,
                 "email": customer.email,
                 "phone": customer.phone,
