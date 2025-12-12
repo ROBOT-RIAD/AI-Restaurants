@@ -8,7 +8,7 @@ from accounts.translations import translate_text
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.parsers import MultiPartParser, FormParser
-from restaurants.models import Restaurant
+from restaurants.models import Restaurant,OpenAndCloseTime
 from .models import Table,Reservation
 from rest_framework.exceptions import ValidationError
 from datetime import datetime, timedelta
@@ -386,6 +386,31 @@ class ReservationCreateAPIView(APIView):
         from_time = datetime.strptime(f"{date} {from_time}", '%Y-%m-%d %H:%M:%S')
         to_time = datetime.strptime(f"{date} {to_time}", '%Y-%m-%d %H:%M:%S')
 
+        # CHECK RESTAURANT OPEN & CLOSE TIME
+        day_name = date.strftime("%A").lower()
+        try:
+            open_close = OpenAndCloseTime.objects.get(
+                restaurant=restaurant,
+                day_of_week=day_name
+            )
+        except OpenAndCloseTime.DoesNotExist:
+            raise ValidationError("Restaurant opening hours for this day are not configured.")
+        
+
+        if open_close.is_closed:
+            raise ValidationError(f"The restaurant is CLOSED on {day_name.capitalize()}.")
+        
+        opening_dt = datetime.combine(date, open_close.opening_time)
+        closing_dt = datetime.combine(date, open_close.closing_time)
+
+        if from_time < opening_dt or to_time > closing_dt:
+            raise ValidationError(
+                f"Reservation must be within business hours: "
+                f"{open_close.opening_time.strftime('%I:%M %p')} - "
+                f"{open_close.closing_time.strftime('%I:%M %p')}."
+            )
+
+
         conflicting_reservations = Reservation.objects.filter(
             table=table,
             date=date
@@ -430,7 +455,6 @@ class ReservationCreateAPIView(APIView):
                 ).exclude(status='finished').exists()
                 if has_unfinished:
                     verified_status = False
-                print("❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️",verified_status)
             reservation = serializer.save(verified=verified_status,customer=customer)
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
@@ -443,6 +467,7 @@ class ReservationCreateAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 
@@ -940,6 +965,36 @@ class PublicReservationCreateAPIView(APIView):
 
         from_time = datetime.strptime(f"{date} {from_time}", '%Y-%m-%d %H:%M:%S')
         to_time = datetime.strptime(f"{date} {to_time}", '%Y-%m-%d %H:%M:%S')
+
+
+         # ----------------------------------------------------
+        # CHECK RESTAURANT OPEN & CLOSE TIME
+        # ----------------------------------------------------
+        day_name = date.strftime("%A").lower()
+
+        try:
+            open_close = OpenAndCloseTime.objects.get(
+                restaurant=restaurant,
+                day_of_week=day_name
+            )
+        except OpenAndCloseTime.DoesNotExist:
+            raise ValidationError("Restaurant opening hours for this day are not configured.")
+
+        # Closed day check
+        if open_close.is_closed:
+            raise ValidationError(f"The restaurant is CLOSED on {day_name.capitalize()}.")
+
+        opening_dt = datetime.combine(date, open_close.opening_time)
+        closing_dt = datetime.combine(date, open_close.closing_time)
+
+        # Time must be within opening hours
+        if from_time < opening_dt or to_time > closing_dt:
+            raise ValidationError(
+                f"Reservation must be within business hours: "
+                f"{open_close.opening_time.strftime('%I:%M %p')} - "
+                f"{open_close.closing_time.strftime('%I:%M %p')}."
+            )
+
 
         conflicting_reservations = Reservation.objects.filter(
             table=table,
