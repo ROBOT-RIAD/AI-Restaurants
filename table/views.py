@@ -67,8 +67,7 @@ class TableCreateView(APIView):
         
         table_name = request.data.get('table_name')
         total_set = request.data.get('total_set')
-        if lean != 'EN':
-                table_name = translate_text(table_name, 'EN')
+        
 
         table_data ={
             "table_name": table_name,
@@ -79,9 +78,6 @@ class TableCreateView(APIView):
         if serializer.is_valid():
             table = serializer.save(restaurant=restaurant)  # ✅ Force restaurant assignment
             response_data = TableSerializer(table).data
-
-            if lean != 'EN':
-                response_data['table_name'] = translate_text(table.table_name, lean)
 
             return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -147,10 +143,7 @@ class TableListView(APIView):
         tables = Table.objects.filter(restaurant=restaurant)
         current_time = timezone.now().astimezone(restaurant_timezone)
 
-        if table_name:
-            if lean != 'EN':
-                table_name = translate_text(table_name, 'EN')
-            tables = tables.filter(table_name__icontains=table_name)
+
 
         
         for table in tables:
@@ -195,12 +188,6 @@ class TableListView(APIView):
 
         serializer = TableSerializer(tables, many=True)
         data = serializer.data
-
-        if lean != 'EN':
-            for table in data:
-                if table.get('table_name'):
-                    table['table_name'] = translate_text(table['table_name'], lean)
-
         return Response(data)
 
 
@@ -247,11 +234,6 @@ class TableDetailApiView(APIView):
 
         serializer = TableSerializer(table)
         data = serializer.data
-
-        if lean != 'EN':
-            if data.get('table_name'):
-                data['table_name'] = translate_text(data['table_name'], lean)
-
         return Response(data)
 
 
