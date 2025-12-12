@@ -39,13 +39,13 @@ class ReservationSerializer(serializers.ModelSerializer):
     table_name = TableNameSerializer(source='table', read_only=True)
     guest_no = serializers.IntegerField(required = False)
     date = serializers.DateField(required = False)
-    allergy = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    comment = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
     table = serializers.PrimaryKeyRelatedField(queryset=Table.objects.all(), required=False)
     class Meta:
         model = Reservation
-        fields = ['id', 'customer', 'customer_name', 'phone_number', 'guest_no','address','allergy', 'status', 'date', 'from_time', 'to_time', 'table', 'email', 'created_at', 'updated_at','table_name']
+        fields = ['id', 'customer', 'customer_name', 'phone_number', 'guest_no','address','comment', 'status', 'date', 'from_time', 'to_time', 'table', 'email', 'created_at', 'updated_at','table_name']
         read_only_fields = ['created_at', 'updated_at','customer']
 
 

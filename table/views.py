@@ -441,7 +441,7 @@ class ReservationCreateAPIView(APIView):
             "from_time": request.data.get('from_time'),
             "to_time": request.data.get('to_time'),
             "table": table.id,
-            "allergy": data.get("allergy", ""),
+            "comment": data.get("comment", ""),
             "status": data.get("status", "reserved"),
         }
 
@@ -996,7 +996,7 @@ class PublicReservationCreateAPIView(APIView):
             "from_time": request.data.get('from_time'),
             "to_time": request.data.get('to_time'),
             "table": table.id,
-            "allergy": data.get("allergy", ""),
+            "comment": data.get("comment", ""),
             "status": data.get("status", "reserved"),
         }
 
@@ -1132,7 +1132,7 @@ class ReservationAutoVerifyView(APIView):
                     <tr><th>Phone</th><td>{phone_number}</td></tr>
                     <tr><th>Email</th><td>{email}</td></tr>
                     <tr><th>Address</th><td>{address}</td></tr>
-                    <tr><th>Allergy Info</th><td>{reservation.allergy or "None"}</td></tr>
+                    <tr><th>Allergy Info</th><td>{reservation.comment or "None"}</td></tr>
                 </table>
 
                 <div class="footer">

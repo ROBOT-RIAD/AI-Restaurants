@@ -35,8 +35,8 @@ class Reservation(models.Model):
     from_time = models.TimeField(help_text="Reservation start time (hh:mm:ss format)")
     to_time = models.TimeField(help_text="Reservation end time (hh:mm:ss format)")
     table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='reservations', help_text="Table reserved")
-    allergy = models.TextField(null=True, blank=True)
     verified = models.BooleanField(default=True,null=True, blank=True)
+    comment = models.TextField(null=True,blank=True,help_text="Additional notes or special instructions for the reservation")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -47,8 +47,3 @@ class Reservation(models.Model):
 
 
    
-
-
-
-
-
