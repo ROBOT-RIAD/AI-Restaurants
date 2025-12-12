@@ -404,11 +404,17 @@ class ReservationCreateAPIView(APIView):
         closing_dt = datetime.combine(date, open_close.closing_time)
 
         if from_time < opening_dt or to_time > closing_dt:
-            raise ValidationError(
-                f"Reservation must be within business hours: "
-                f"{open_close.opening_time.strftime('%I:%M %p')} - "
-                f"{open_close.closing_time.strftime('%I:%M %p')}."
-            )
+            return Response(
+                    {
+                        "error": (
+                            f"Reservation must be within business hours: "
+                            f"{open_close.opening_time.strftime('%I:%M %p')} - "
+                            f"{open_close.closing_time.strftime('%I:%M %p')}."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
 
 
         conflicting_reservations = Reservation.objects.filter(
@@ -989,11 +995,16 @@ class PublicReservationCreateAPIView(APIView):
 
         # Time must be within opening hours
         if from_time < opening_dt or to_time > closing_dt:
-            raise ValidationError(
-                f"Reservation must be within business hours: "
-                f"{open_close.opening_time.strftime('%I:%M %p')} - "
-                f"{open_close.closing_time.strftime('%I:%M %p')}."
-            )
+            return Response(
+                    {
+                        "error": (
+                            f"Reservation must be within business hours: "
+                            f"{open_close.opening_time.strftime('%I:%M %p')} - "
+                            f"{open_close.closing_time.strftime('%I:%M %p')}."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
 
         conflicting_reservations = Reservation.objects.filter(
