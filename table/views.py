@@ -285,9 +285,6 @@ class TableUpdateAPIView(APIView):
         status = request.data.get('status', table.status)
         reservation_status = request.data.get('reservation_status', table.reservation_status)
 
-        if lean != 'EN':
-            if table_name:
-                table_name = translate_text(table_name, "EN")
 
         table_data ={
             'table_name': table_name,
@@ -300,10 +297,6 @@ class TableUpdateAPIView(APIView):
         if serializer.is_valid():
             serializer.save()
             data = serializer.data
-
-            if lean != 'EN':
-                if data.get('table_name'):
-                    data['table_name'] = translate_text(data['table_name'], lean)
 
             return Response(data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
