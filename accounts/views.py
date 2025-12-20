@@ -407,7 +407,6 @@ class RestaurantFullDataAPIView(APIView):
                 "from_time": reservation.from_time,
                 "to_time": reservation.to_time,
                 "table": reservation.table.table_name,
-                "email": reservation.email,
             })
 
 
