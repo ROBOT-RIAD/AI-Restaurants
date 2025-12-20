@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from restaurants.models import Restaurant
+from django.db.models import Q
 
 from .models import Customer
 from .serializers import CustomerSerializer
@@ -28,27 +29,25 @@ class CustomerViewSet(ModelViewSet):
     search_fields = ["customer_name", "phone"]
 
     def get_queryset(self):
-        """
-        Return only customers belonging to restaurants owned by the logged-in user.
-        """
         user = self.request.user
         return Customer.objects.filter(
-            restaurant__owner=user
-        ).order_by('-id')
+            Q(orders__restaurant__owner=user) |
+            Q(reservations__table__restaurant__owner=user) |
+            Q(services__restaurant__owner=user)
+        ).distinct().order_by('-id')
+
 
     def perform_create(self, serializer):
-        """
-        Ensure that a new customer is always linked to a restaurant owned by the logged-in user.
-        """
         user = self.request.user
-        # Get all restaurants owned by this user
-        restaurants = Restaurant.objects.filter(owner=user)
-        if not restaurants.exists():
-            raise PermissionDenied("You do not own any restaurant.")
-        
-        # Optional: Assign the first restaurant if multiple exist
-        # You can also accept restaurant_id from request.data and validate ownership
-        serializer.save(restaurant=restaurants.first())
+        restaurant_id = self.request.data.get("restaurant")
+        if not restaurant_id:
+            raise PermissionDenied("Restaurant ID is required.")
+
+        restaurant = Restaurant.objects.filter(id=restaurant_id, owner=user).first()
+        if not restaurant:
+            raise PermissionDenied("You do not own this restaurant.")
+
+        serializer.save()
 
     @swagger_auto_schema(
         operation_summary="List all customers",
