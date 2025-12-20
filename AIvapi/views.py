@@ -101,11 +101,12 @@ class AssistantCreateView(APIView):
         twilio_auth_token = data["twilio_auth_token"]
 
 
-        phone_number_1 = str(restaurant.phone_number_1).strip()
-        if not re.fullmatch(r'\+\d{7,18}', phone_number_1):
+        phone_number_1 = phone_number_1.strip()
+
+        if not re.fullmatch(r'^\+\d{7,18}$', phone_number_1):
             return Response(
                 {
-                    "error": "You must add a country code to the phone number. Example: +4915888648996"
+                    "error": f"Invalid phone number format. Example:{phone_number_1}"
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
