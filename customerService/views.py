@@ -178,19 +178,29 @@ class CustomerSummaryAPIView(APIView):
             if isinstance(latest_record, Reservation):
                 last_type = "reservation"
                 name = latest_record.customer.customer_name
+                email = latest_record.customer.email
+                address = latest_record.customer.address
             elif isinstance(latest_record, Order):
                 last_type = "order"
                 name = latest_record.customer.customer_name
+                email = latest_record.customer.email
+                address= latest_record.customer.address
             elif isinstance(latest_record, CustomerService):
                 last_type = "service"
                 name = latest_record.customer.customer_name
+                email = latest_record.customer.email
+                address= latest_record.customer.address
             else:
                 last_type = None
                 name = None
+                email=None
+                address =None
 
             customer_data[phone] = {
                 "name": name,
                 "phone": phone,
+                "email":email,
+                "address":address,
                 "most_recent_last": {
                     "type": last_type,
                     "created_at": latest_record.created_at if latest_record else None,
