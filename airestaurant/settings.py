@@ -29,6 +29,16 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+ALLOWED_HOSTS = ['*']
+CORS_ORIGIN_ALLOW_ALL = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://api.trusttaste.ai',
+    'https://www.api.trusttaste.ai',
+    'https://admin.trusttaste.ai/',
+    'http://localhost:5173/',
+    'https://localhost:5173/',
+    'https://172.30.48.1:5173'
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -168,22 +178,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 ################################################################################################################################
 
-
-ALLOWED_HOSTS = ['*']
-# CORS_ORIGIN_ALLOW_ALL = True
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOW_CREDENTIALS = True
-
-CSRF_TRUSTED_ORIGINS = [
-    'https://api.trusttaste.ai',
-    'https://www.api.trusttaste.ai',
-    'https://admin.trusttaste.ai/',
-    'http://localhost:5173/',
-    'https://localhost:5173/',
-    'https://172.30.48.1:5173'
-]
-
 AUTH_USER_MODEL = 'accounts.User'
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 REST_FRAMEWORK = {
