@@ -360,15 +360,15 @@ class CustomerOrdersByPhoneAPIView(APIView):
         if not customer:
             return Response({"error": "Customer not found"}, status=404)
         
-        orders = Order.objects.filter(restaurant__in=restaurants, customer__phone=phone)
+        orders = Order.objects.filter(restaurant__in=restaurants, customer__phone=phone).order_by("-created_at")
 
         total_order = orders.count()
         total_order_price = orders.aggregate(total=models.Sum("total_price"))["total"] or 0
         first_order_date = orders.order_by("created_at").first().created_at if orders.exists() else None
         last_order_date = orders.order_by("-created_at").first().created_at if orders.exists() else None
 
-        reservations = Reservation.objects.filter(table__restaurant__in=restaurants, customer__phone=phone)
-        services = CustomerService.objects.filter(restaurant__in=restaurants, customer__phone=phone)
+        reservations = Reservation.objects.filter(table__restaurant__in=restaurants, customer__phone=phone).order_by("-created_at")
+        services = CustomerService.objects.filter(restaurant__in=restaurants, customer__phone=phone).order_by("-created_at")
 
 
         return Response({
