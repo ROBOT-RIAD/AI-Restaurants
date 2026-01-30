@@ -377,6 +377,12 @@ class ReservationCreateAPIView(APIView):
         except Table.DoesNotExist:
             raise ValidationError("Invalid table ID provided.")
         
+        guest_no = int(data.get("guest_no", 0))
+        
+        if guest_no > table.total_set:
+            raise ValidationError(
+                f"This table cannot hold more than {table.total_set} guests."
+            )
         date = request.data.get('date')
         from_time = request.data.get('from_time')
         to_time = request.data.get('to_time')
@@ -960,6 +966,13 @@ class PublicReservationCreateAPIView(APIView):
             table = Table.objects.get(id=table_id)
         except Table.DoesNotExist:
             raise ValidationError("Invalid table ID provided.")
+        
+        guest_no = int(data.get("guest_no", 0))
+        
+        if guest_no > table.total_set:
+            raise ValidationError(
+                f"This table cannot hold more than {table.total_set} guests."
+            )
         
         restaurant = table.restaurant
         
