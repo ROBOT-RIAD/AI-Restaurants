@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import CustomerService
 from customer.models import Customer
 
+
 class CustomerServiceSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(required=False)
     email = serializers.EmailField(required=False)
