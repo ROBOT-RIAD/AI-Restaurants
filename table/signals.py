@@ -111,45 +111,40 @@ def send_reservation_verified_email(reservation):
     
     verify_link = f"https://api.trusttaste.ai/public/reservations/verify/{reservation.id}/"
 
-    subject = f"🔔 Bitte bestätigen Sie Ihre Reservierung (ID: {reservation.id})"
+    subject = f"Please confirm your reservation (ID: {reservation.id})"
+
     message = format_html(f"""
-    <html lang="de">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Reservierungsbestätigung</title>
-    </head>
-    <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; color: #333;">
-        <div style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-            
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="font-size: 24px; color: #007bff; margin: 0;">Hallo {customer_name},</h3>
-            </div>
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+        
+        <p>Hello {customer_name},</p>
 
-            <div style="font-size: 16px; line-height: 1.6; color: #555; margin-bottom: 20px;">
-                <p>Wir haben festgestellt, dass Sie bereits eine laufende Reservierung haben. Um sicherzustellen, dass alles korrekt ist, bestätigen Sie bitte Ihre neue Reservierung.</p>
-                <p>Bitte bestätigen Sie Ihre Reservierung, indem Sie auf den folgenden Link klicken:</p>
-            </div>
+        <p>Thank you for your reservation.</p>
 
-            <div style="text-align: center; margin-bottom: 20px;">
-                <a href="{verify_link}" style="background-color: #007bff; color: white; padding: 12px 18px; font-size: 16px; border-radius: 5px; text-decoration: none; display: inline-block;">
-                    Reservierung bestätigen
-                </a>
-            </div>
+        <p>
+        In order to finalize your reservation in the system, 
+        we need your confirmation via the link in this email.
+        </p>
 
-            <div style="font-size: 16px; line-height: 1.6; color: #555; margin-bottom: 20px;">
-                <p>Oder kopieren Sie diesen Link in Ihren Browser:</p>
-                <p><a href="{verify_link}" style="color: #007bff; text-decoration: none;">{verify_link}</a></p>
-            </div>
+        <p>We look forward to your visit.</p>
 
-            <div style="font-size: 14px; color: #777; text-align: center;">
-                <p>Vielen Dank, dass Sie sich für uns entschieden haben!</p>
-            </div>
+        <p><b>Please confirm your reservation by clicking on the following link:</b></p>
 
-        </div>
+        <p>
+            <a href="{verify_link}" 
+               style="background-color: #007bff; color: #fff; padding: 10px 15px; 
+               text-decoration: none; border-radius: 5px;">
+               Confirm Reservation
+            </a>
+        </p>
+
+        <p>Or copy and paste this link into your browser:</p>
+
+        <p>{verify_link}</p>
+
     </body>
     </html>
- """)
+    """)
 
     send_mail(
         subject,
@@ -158,8 +153,6 @@ def send_reservation_verified_email(reservation):
         [customer_email],
         html_message=message
     )
-
-
 
 
 # def send_reservation_confirmation_email_manual(reservation):
@@ -239,11 +232,10 @@ def send_reservation_verified_email(reservation):
 
 
 def send_reservation_confirmation_email_manual(reservation):
-    """Send reservation confirmation email (can be used in signals or manually)."""
+    """Send reservation confirmation email (clean format)."""
     if not reservation.customer or not reservation.customer.email:
         return
     
-
     customer = reservation.customer
     table = reservation.table
     restaurant = table.restaurant
@@ -255,54 +247,40 @@ def send_reservation_confirmation_email_manual(reservation):
     customer_from_time = reservation.from_time.strftime('%I:%M %p')
     customer_to_time = reservation.to_time.strftime('%I:%M %p')
 
-    restaurant_email = restaurant.owner.email if restaurant.owner else None
-    restaurant_phone1 = restaurant.phone_number_1
-    restaurant_phone2 = restaurant.twilio_number
-    website = getattr(restaurant, "website", "")
-    restaurant_address = restaurant.address
+    subject = "Reservation Confirmed"
 
+    message = format_html("""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
 
-    subject = "Reservierungsbestätigung"
-    message = format_html(
-        """
-        <h3>Ihre Reservierung ist bestätigt!</h3>
-        <p>Vielen Dank für Ihre Reservierung bei <b>{restaurant_name}</b>.</p>
-        <p><b>Reservierungsdetails:</b></p>
+        <p>Hello {customer_name},</p>
+
+        <p>Your reservation has been successfully confirmed.</p>
+
+        <p><b>Reservation Details:</b></p>
         <ul>
-            <li><b>Name:</b> {customer_name}</li>
-            <li><b>Telefon:</b> {customer_phone}</li>
-            <li><b>E-Mail:</b> {customer_email}</li>
-            <li><b>Datum:</b> {reservation_date}</li>
-            <li><b>Startzeit:</b> {customer_from_time}</li>
-            <li><b>Endzeit:</b> {customer_to_time}</li>
-            <li><b>Gästeanzahl:</b> {customer_guest_no}</li>
-            <li><b>Tisch:</b> {table_name}</li>
+            <li>Date: {reservation_date}</li>
+            <li>Time: {customer_from_time} - {customer_to_time}</li>
+            <li>Guests: {customer_guest_no}</li>
+            <li>Table: {table_name}</li>
         </ul>
-        <p><b>Restaurantdetails:</b></p>
-        <ul>
-            <li><b>E-Mail:</b> {restaurant_email}</li>
-            <li><b>Telefon:</b> {restaurant_phone1}</li>
-            <li><b>Telefon Online:</b> {restaurant_phone2}</li>
-            <li><b>Adresse:</b> {restaurant_address}</li>
-            <li><b>Website:</b> {website}</li>
-        </ul>
-        <p>Wir freuen uns darauf, Sie willkommen zu heißen!</p>
-        <p>Bei Fragen können Sie uns jederzeit kontaktieren.</p>
-        """,
-        restaurant_name=restaurant.resturent_name,
+
+        <p><b>Restaurant:</b> {restaurant_name}</p>
+        <p>Address: {restaurant_address}</p>
+
+        <p>We look forward to your visit.</p>
+
+    </body>
+    </html>
+    """,
+        customer_name=customer_name,
         reservation_date=reservation.date,
         customer_from_time=customer_from_time,
         customer_to_time=customer_to_time,
-        table_name=table.table_name,
-        restaurant_email=restaurant_email,
-        restaurant_phone1=restaurant_phone1,
-        restaurant_phone2=restaurant_phone2,
-        website=website,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
         customer_guest_no=customer_guest_no,
-        customer_email=customer_email,
-        restaurant_address=restaurant_address,
+        table_name=table.table_name,
+        restaurant_name=restaurant.resturent_name,
+        restaurant_address=restaurant.address,
     )
 
     send_mail(
@@ -312,8 +290,6 @@ def send_reservation_confirmation_email_manual(reservation):
         [customer_email],
         html_message=message
     )
-
-
 
 @receiver(post_save, sender=Reservation)
 def send_reservation_confirmation_email(sender, instance, created, **kwargs):
