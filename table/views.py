@@ -918,7 +918,8 @@ class TableReservationsView(APIView):
                     "guest_no": reservation.guest_no,
                     "from_time": reservation.from_time.strftime('%H:%M:%S'),
                     "to_time": reservation.to_time.strftime('%H:%M:%S'),
-                    "status": reservation.status
+                    "status": reservation.status,
+                    "verified": reservation.verified,
                 }
                 for reservation in reservations
             ]

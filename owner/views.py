@@ -313,8 +313,8 @@ class RestaurantStatsAPIView(APIView):
             .annotate(res_count=Count('id'))
         )
 
-        new_reservation_customers = [r['customer__phone'] for r in reservation_counts if r['res_count'] == 1]
-        returning_reservation_customers = [r['customer__phone'] for r in reservation_counts if r['res_count'] > 1]
+        new_reservation_customers = [r['customer__phone'] for r in reservation_counts if r['res_count'] == 0]
+        returning_reservation_customers = [r['customer__phone'] for r in reservation_counts if r['res_count'] >= 1]
 
         number_of_new_customer_reservations = reservations.filter(customer__phone__in=new_reservation_customers).count()
         number_of_returning_customer_reservations = reservations.filter(customer__phone__in=returning_reservation_customers).count()
