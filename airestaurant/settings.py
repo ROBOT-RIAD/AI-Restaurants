@@ -37,7 +37,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://admin.trusttaste.ai/',
     'http://localhost:5173/',
     'https://localhost:5173/',
-    'https://172.30.48.1:5173'
+    'https://172.30.48.1:5173',
+    'https://sacred-renewing-dove.ngrok-free.app'
 ]
 # Application definition
 

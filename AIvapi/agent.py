@@ -62,7 +62,7 @@ class AGENT:
         ssid="", 
         restaurant_fallback="", 
         auth_token="", 
-        webhook="https://sacred-renewing-dove.ngrok-free.app/vapi-webhook/"
+        webhook="https://api.trusttaste.ai/vapi-webhook/"
         ):
         
         if not voice and not self.voice:
